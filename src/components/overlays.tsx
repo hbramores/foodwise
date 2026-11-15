@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import {
   useCallback,
   useEffect,
@@ -61,7 +62,7 @@ export function Modal({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <>
       <div className={cx("scrim", entered && "is-open")} onClick={onClose} aria-hidden="true" />
       <div
@@ -100,7 +101,8 @@ export function Modal({
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 
@@ -130,7 +132,7 @@ export function Drawer({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <>
       <div className={cx("scrim", entered && "is-open")} onClick={onClose} aria-hidden="true" />
       <div
@@ -150,7 +152,8 @@ export function Drawer({
           {children}
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 

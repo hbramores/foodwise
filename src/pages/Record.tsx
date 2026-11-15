@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarCheck, Check, ClipboardList, Save, Trash2, TriangleAlert } from "lucide-react";
+import { CalendarCheck, Check, ClipboardList, Save, SlidersHorizontal, Trash2, TriangleAlert } from "lucide-react";
 import { useData } from "../data/store";
 import { useToast } from "../data/toast";
 import { useNavGuard } from "../data/nav";
@@ -49,6 +49,7 @@ export function Record({ navigate }: { navigate: (r: RouteKey) => void }) {
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [dirty, setDirty] = useState(false);
+  const [expanded, setExpanded] = useState<string[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Dish | null>(null);
 
   const dirtyRef = useRef(false);
@@ -230,25 +231,24 @@ export function Record({ navigate }: { navigate: (r: RouteKey) => void }) {
       />
 
       {dirty ? (
-        <div className="callout callout--amber" style={{ marginBottom: 16 }}>
+        <div className="record-status" role="status">
           <TriangleAlert className="ico" />
           <span>
-            You have unsaved changes for {formatLong(date)}. Save them before leaving this page.
+            Unsaved changes � {formatLong(date)}
           </span>
         </div>
       ) : null}
 
-      <div className="reclist">
+      <div className="reclist recording-compact">
         <div className="recline recline--head" aria-hidden="true">
           <span>Dish</span>
           <span>Prepared</span>
           <span>Sold</span>
-          <span>Discarded</span>
-          <span>Unsold / Retained</span>
+          <span>Unsold</span>
           <span style={{ textAlign: "right" }}>Actions</span>
         </div>
 
-        {computed.map(({ dish, draft, unsold, retained, exists }) => {
+        {computed.map(({ dish, draft, unsold, exists }) => {
           const err = errors[dish.id];
           const off = !draft.wasOffered;
           return (
@@ -264,7 +264,7 @@ export function Record({ navigate }: { navigate: (r: RouteKey) => void }) {
               </div>
 
               {off ? (
-                <div className="recline__off" style={{ gridColumn: "2 / -1" }}>
+                <div className="recline__off" style={{ gridColumn: "2 / 5" }}>
                   <StatusPill tone="plain">Not offered — excluded from averages</StatusPill>
                 </div>
               ) : (
@@ -293,32 +293,17 @@ export function Record({ navigate }: { navigate: (r: RouteKey) => void }) {
                       aria-label={`${dish.name} sold servings`}
                     />
                   </div>
-                  <div className="recline__field">
-                    <span>Discarded</span>
-                    <input
-                      className="input"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      placeholder="0"
-                      value={draft.discarded}
-                      onChange={(e) => update(dish.id, { discarded: e.target.value })}
-                      aria-label={`${dish.name} discarded servings`}
-                    />
-                  </div>
                   <div className="recline__calc">
                     <div>
                       <span>Unsold</span>
                       <b>{num(unsold)}</b>
-                    </div>
-                    <div>
-                      <span>Retained</span>
-                      <b>{num(Math.max(0, retained))}</b>
                     </div>
                   </div>
                 </>
               )}
 
               <div className="recline__actions">
+                {!off ? <IconButton label={`Optional details for ${dish.name}`} ghost size="sm" aria-expanded={expanded.includes(dish.id)} onClick={() => setExpanded(prev => prev.includes(dish.id) ? prev.filter(id => id !== dish.id) : [...prev, dish.id])}><SlidersHorizontal className="ico" /></IconButton> : null}
                 <button
                   type="button"
                   className="chip"
@@ -341,6 +326,12 @@ export function Record({ navigate }: { navigate: (r: RouteKey) => void }) {
                 ) : null}
               </div>
 
+              {!off && expanded.includes(dish.id) ? <div className="record-extras">
+                <div className="record-extras__fields">
+                  <label className="field">Discarded servings<input className="input" inputMode="numeric" value={draft.discarded} placeholder="0" aria-label={`${dish.name} discarded servings`} onChange={e => update(dish.id, {discarded: e.target.value})} /></label>
+                  <label className="field">Notes<input className="input" value={draft.notes} placeholder="Optional notes for the day" aria-label={`${dish.name} notes`} onChange={e => update(dish.id, {notes: e.target.value})} /></label>
+                </div>
+              </div> : null}
               {err ? (
                 <div style={{ gridColumn: "1 / -1" }}>
                   <span className="field__err" role="alert">
@@ -353,7 +344,7 @@ export function Record({ navigate }: { navigate: (r: RouteKey) => void }) {
         })}
       </div>
 
-      <div className="callout" style={{ marginTop: 16 }}>
+      <div className="record-help">
         <ClipboardList className="ico" />
         <span>
           Unsold = Prepared − Sold. Retained = Unsold − Discarded. Retained servings are not
@@ -408,8 +399,7 @@ function RecordHeader({
             Daily <span className="accent">Recording</span>
           </h1>
           <p className="head__sub">
-            Record what your kitchen prepared and sold today. Unsold and retained quantities appear
-            as you type.
+            Enter how many servings were prepared and sold.
           </p>
         </div>
       </div>

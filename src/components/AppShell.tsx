@@ -15,15 +15,15 @@ import { todayISO } from "../lib/date";
 
 const NAV = [
   { key: "menu" as RouteKey, label: "Menu", icon: LayoutGrid },
-  { key: "record" as RouteKey, label: "Record", icon: ClipboardList },
+  { key: "record" as RouteKey, label: "Daily Recording", icon: ClipboardList },
   { key: "history" as RouteKey, label: "History", icon: HistoryIcon },
   { key: "settings" as RouteKey, label: "Settings", icon: SettingsIcon },
 ];
 
 export const SECTION_LABEL: Record<RouteKey, string> = {
-  menu: "Today's Menu",
+  menu: "Menu",
   record: "Daily Recording",
-  history: "Daily History",
+  history: "History",
   settings: "Settings",
 };
 
@@ -56,13 +56,13 @@ function Sidebar({
           </span>
           <span className="brand__name">
             FoodWise PH
-            <small>Forecasting</small>
+            <small>Kitchen, in balance</small>
           </span>
         </span>
       </div>
 
       <nav className="side__nav">
-        <div className="side__group">Main</div>
+        <div className="side__group">Workspace</div>
         {NAV.map((item) => {
           const Icon = item.icon;
           return (

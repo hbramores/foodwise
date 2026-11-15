@@ -37,7 +37,7 @@ function migrate(raw: unknown): AppData {
 export function loadData(): AppData {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return emptyData();
+    if (!raw) return buildDemoData();
     return migrate(JSON.parse(raw));
   } catch {
     return emptyData();
@@ -73,7 +73,7 @@ let demoCache: AppData | null = null;
 
 /**
  * Realistic sample restaurant used by "Explore Demo" and the demo-data actions.
- * Historical period is 3 days so the visible recommendations match the sample
+ * Historical period is 7 days so the visible recommendations match the sample
  * calculations in the product requirements.
  */
 export function buildDemoData(): AppData {
@@ -221,6 +221,9 @@ export function buildDemoData(): AppData {
       if (i < spec.soldRecent.length) {
         sold = spec.soldRecent[i];
         prepared = spec.prepRecent[i];
+      } else if (i < 7) {
+        sold = spec.soldBase;
+        prepared = spec.prepBase;
       } else {
         const drift = i >= 7 ? -1 : 0;
         sold = Math.max(
@@ -260,7 +263,7 @@ export function buildDemoData(): AppData {
     restaurant,
     dishes,
     records,
-    settings: { historicalPeriod: 3, safetyAllowance: 0.1 },
+    settings: { historicalPeriod: 7, safetyAllowance: 0.1 },
   };
   return structuredCloneSafe(demoCache);
 }

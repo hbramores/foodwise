@@ -77,5 +77,13 @@ console.log(
 );
 if (!(offered.eligibleDays === 5 && withOff.eligibleDays === 4)) failures += 1;
 
+// Zero sales count as a recorded day; same-day and future sales never enter a forecast.
+const sample = data.records.filter(r => r.dishId === data.dishes[0].id).slice(0, 3);
+const zeros = computeForecast(sample.map(r => ({...r, sold: 0})), data.settings, today);
+if (zeros.eligibleDays !== 3 || zeros.recommended !== 0) failures += 1;
+const boundary = computeForecast([...sample, {...sample[0], date: today, sold: 9999}], data.settings, today);
+if (boundary.eligibleDays !== 3 || boundary.totalSold !== sample.reduce((sum,r) => sum+r.sold,0)) failures += 1;
+console.log("Zero-sales and forecast-date boundary checks:", zeros.recommended === 0 && boundary.eligibleDays === 3 ? "PASS" : "FAIL");
+
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} CHECK(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

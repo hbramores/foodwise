@@ -7,15 +7,10 @@ export function BrandMark({ size = 22 }: { size?: number }) {
       aria-hidden="true"
       focusable="false"
     >
-      {/* steam */}
-      <path d="M9.2 3.2c.9 1 .9 2 0 3" />
-      <path d="M12.6 2.6c.9 1 .9 2 0 3" />
-      <path d="M16 3.4c.9 1 .9 2 0 3" />
-      {/* bowl */}
-      <path d="M3.6 11h16.8a8.4 8.4 0 0 1-8.4 8.4A8.4 8.4 0 0 1 3.6 11Z" />
-      <path d="M2.2 21h19.6" />
-      {/* leaf tucked in the bowl */}
-      <path d="M13.9 9.6c1.6-1.9 3.4-2 4.6-1.4-.2 1.7-1.5 3.2-3.6 3.2" />
+      {/* An open plate rim frames a geometric F: food, portion, and forward motion. */}
+      <path d="M17.8 3.5A10 10 0 1 0 21.5 15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M8 7h10v2.5h-7.3v3H16V15h-5.3v4H8Z" fill="currentColor" stroke="none" />
+      <circle cx="21" cy="8" r="1.6" fill="currentColor" stroke="none" />
     </svg>
   );
 }

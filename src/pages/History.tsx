@@ -57,16 +57,6 @@ export function History({ navigate }: { navigate: (r: RouteKey) => void }) {
     [records, startDate, dishFilter]
   );
 
-  const totals = filtered.reduce(
-    (acc, r) => ({
-      prepared: acc.prepared + r.prepared,
-      sold: acc.sold + r.sold,
-      unsold: acc.unsold + Math.max(0, calcUnsold(r.prepared, r.sold)),
-      discarded: acc.discarded + (r.wasOffered ? r.discarded : 0),
-    }),
-    { prepared: 0, sold: 0, unsold: 0, discarded: 0 }
-  );
-
   const chartData = useMemo(() => {
     const map = new Map<string, { date: string; prepared: number; sold: number }>();
     for (const r of filtered) {
@@ -86,7 +76,7 @@ export function History({ navigate }: { navigate: (r: RouteKey) => void }) {
         <div className="head__lead">
           <div>
             <h1 className="head__title">
-              Daily <span className="accent">History</span>
+              History
             </h1>
             <p className="head__sub">
               Review your kitchen&rsquo;s previous preparation and sales, and spot overproduction.
@@ -143,14 +133,8 @@ export function History({ navigate }: { navigate: (r: RouteKey) => void }) {
         </div>
       ) : (
         <>
-          <div className="kpis" style={{ marginBottom: 20 }}>
-            <SummaryCard tone="caramel" label="Total prepared" value={num(totals.prepared)} />
-            <SummaryCard tone="good" label="Total sold" value={num(totals.sold)} />
-            <SummaryCard tone="amber" label="Total unsold" value={num(totals.unsold)} />
-            <SummaryCard tone="danger" label="Total discarded" value={num(totals.discarded)} />
-          </div>
-
-          <div style={{ display: "grid", gap: 16 }}>
+          <div className="history-content" style={{ display: "grid", gap: 16 }}>
+            <details className="history-chart"><summary>Production vs. sales</summary>
             <Card
               title="Prepared vs sold"
               icon={<CalendarRange className="ico" />}
@@ -233,6 +217,7 @@ export function History({ navigate }: { navigate: (r: RouteKey) => void }) {
               </div>
             </Card>
 
+            </details>
             <Card
               title="Records"
               icon={<ClipboardList className="ico" />}
@@ -364,25 +349,6 @@ export function History({ navigate }: { navigate: (r: RouteKey) => void }) {
 
 function relativeWeekday(iso: string): string {
   return formatLong(iso).replace(/^\w+, /, "");
-}
-
-function SummaryCard({
-  tone,
-  label,
-  value,
-}: {
-  tone: "caramel" | "good" | "amber" | "danger";
-  label: string;
-  value: string;
-}) {
-  return (
-    <section className={`card kpi kpi--${tone}`}>
-      <div className="kpi__body">
-        <span className="kpi__label">{label}</span>
-        <span className="kpi__value">{value}</span>
-      </div>
-    </section>
-  );
 }
 
 function ViewRecordModal({

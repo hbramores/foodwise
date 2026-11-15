@@ -1,20 +1,16 @@
 import { useMemo, useState } from "react";
 import {
   Archive,
-  CalendarCheck,
   ChefHat,
-  LayoutGrid,
   Plus,
   Search,
   Sparkles,
-  UtensilsCrossed,
 } from "lucide-react";
 import { useData, type DishInput } from "../data/store";
 import { useToast } from "../data/toast";
 import { DISH_CATEGORIES, type Dish, type DishCategory } from "../types";
 import { computeForecast } from "../lib/forecast";
-import { addDaysISO, formatLong, todayISO } from "../lib/date";
-import { num } from "../lib/format";
+import { todayISO } from "../lib/date";
 import { DishCard } from "../components/DishCard";
 import { DishDetailDrawer } from "../components/DishDetail";
 import { DishForm } from "../components/DishForm";
@@ -34,7 +30,6 @@ export function Menu({ navigate }: { navigate: (r: RouteKey) => void }) {
     addDish,
     updateDish,
     setDishStatus,
-    recordFor,
   } = useData();
   const { push } = useToast();
 
@@ -68,16 +63,6 @@ export function Menu({ navigate }: { navigate: (r: RouteKey) => void }) {
       })),
     [activeDishes, byDish, settings, forecastDate]
   );
-
-  const totalRecommended = activeForecasts.reduce(
-    (sum, f) => sum + (f.forecast.recommended ?? 0),
-    0
-  );
-  const dishesWithRec = activeForecasts.filter((f) => f.forecast.recommended !== null).length;
-
-  const yesterday = addDaysISO(today, -1);
-  const yesterdayMissing = activeDishes.filter((d) => !recordFor(d.id, yesterday)).length;
-  const yesterdayComplete = activeDishes.length > 0 && yesterdayMissing === 0;
 
   const pool = showArchived ? archivedDishes : activeDishes;
   const visible = useMemo(() => {
@@ -126,15 +111,9 @@ export function Menu({ navigate }: { navigate: (r: RouteKey) => void }) {
       <section className="head">
         <div className="head__lead">
           <div>
-            <p className="field__hint" style={{ marginBottom: 6 }}>
-              {data.restaurant?.name}
-              {data.restaurant?.type ? ` · ${data.restaurant.type}` : ""}
-            </p>
-            <h1 className="head__title">
-              Today&rsquo;s <span className="accent">Menu</span>
-            </h1>
+            <h1 className="head__title">Menu</h1>
             <p className="head__sub">
-              Here&rsquo;s what we recommend preparing. Recommendations update as you record sales.
+              Recommended servings for your next preparation.
             </p>
           </div>
         </div>
@@ -151,24 +130,13 @@ export function Menu({ navigate }: { navigate: (r: RouteKey) => void }) {
           </Button>
         </div>
 
-        <div className="head__stats">
-          <span className="badge badge--plain">
-            Preparing for {formatLong(forecastDate)}
-          </span>
-          <span className="badge badge--sage">
-            History period: last {settings.historicalPeriod} days
-          </span>
-          <span className="badge badge--caramel">
-            Safety allowance: {Math.round(settings.safetyAllowance * 100)}%
-          </span>
-        </div>
       </section>
 
       {isEmptyMenu ? (
         <div className="panel">
           <EmptyState
             icon={<ChefHat style={{ width: 34, height: 34, strokeWidth: 1.4 }} />}
-            title="Your menu starts here."
+            title="No dishes yet."
             description="Add your first dish to start recording sales and receiving preparation recommendations."
             action={
               <Button variant="accent" icon={<Plus className="ico" />} onClick={openAdd}>
@@ -179,42 +147,6 @@ export function Menu({ navigate }: { navigate: (r: RouteKey) => void }) {
         </div>
       ) : (
         <>
-          <div className="kpis" style={{ marginBottom: 20 }}>
-            <SummaryCard
-              tone="caramel"
-              icon={<UtensilsCrossed className="ico" />}
-              label="Recommended servings"
-              value={num(totalRecommended)}
-              foot={`Across ${dishesWithRec} ${
-                dishesWithRec === 1 ? "dish with enough data" : "dishes with enough data"
-              }`}
-            />
-            <SummaryCard
-              tone="sage"
-              icon={<LayoutGrid className="ico" />}
-              label="Active dishes"
-              value={num(activeDishes.length)}
-              foot={
-                archivedDishes.length > 0
-                  ? `${archivedDishes.length} archived`
-                  : "Your full active menu"
-              }
-            />
-            <SummaryCard
-              tone={yesterdayComplete ? "good" : "amber"}
-              icon={<CalendarCheck className="ico" />}
-              label="Recorded yesterday"
-              value={yesterdayComplete ? "Complete" : `${yesterdayMissing} left`}
-              foot={
-                activeDishes.length === 0
-                  ? "Add a dish to begin"
-                  : yesterdayComplete
-                    ? `All records saved for ${formatLong(yesterday)}`
-                    : `Missing for ${formatLong(yesterday)}`
-              }
-            />
-          </div>
-
           <div className="toolbar">
             <label className="search" style={{ minWidth: 220, flex: "0 1 300px" }}>
               <Search className="ico" aria-hidden="true" />
@@ -226,15 +158,10 @@ export function Menu({ navigate }: { navigate: (r: RouteKey) => void }) {
               />
             </label>
 
-            <Chip active={category === "All Dishes"} onClick={() => setCategory("All Dishes")}>
-              All dishes
-            </Chip>
-            {DISH_CATEGORIES.map((c) => (
-              <Chip key={c} active={category === c} onClick={() => setCategory(c)}>
-                {c}
-              </Chip>
-            ))}
-
+            <select className="select" aria-label="Filter by category" value={category} onChange={e => setCategory(e.target.value as CategoryFilter)}>
+              <option value="All Dishes">All categories</option>
+              {DISH_CATEGORIES.map(c => <option key={c}>{c}</option>)}
+            </select>
             <span className="toolbar__spacer" />
 
             <Chip active={showArchived} onClick={() => setShowArchived((v) => !v)}>
@@ -286,7 +213,7 @@ export function Menu({ navigate }: { navigate: (r: RouteKey) => void }) {
             </div>
           )}
 
-          {!isArchivedView && dishesWithRec < activeDishes.length ? (
+          {!isArchivedView && activeForecasts.some(f => f.forecast.recommended === null) ? (
             <div className="callout callout--amber" style={{ marginTop: 20 }}>
               <Sparkles className="ico" />
               <span>
@@ -344,34 +271,5 @@ export function Menu({ navigate }: { navigate: (r: RouteKey) => void }) {
         }}
       />
     </>
-  );
-}
-
-function SummaryCard({
-  tone,
-  icon,
-  label,
-  value,
-  foot,
-}: {
-  tone: "caramel" | "sage" | "good" | "amber";
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  foot: string;
-}) {
-  return (
-    <section className={`card kpi kpi--${tone}`}>
-      <div className="kpi__body">
-        <div className="kpi__top">
-          <span className="kpi__ico">{icon}</span>
-          <span className="kpi__label">{label}</span>
-        </div>
-        <span className="kpi__value">{value}</span>
-      </div>
-      <div className="kpi__foot">
-        <span>{foot}</span>
-      </div>
-    </section>
   );
 }
