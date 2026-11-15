@@ -1,17 +1,5 @@
-export type DishCategory =
-  | "Main Dishes"
-  | "Pasta & Noodles"
-  | "Snacks"
-  | "Desserts"
-  | "Other";
-
-export const DISH_CATEGORIES: DishCategory[] = [
-  "Main Dishes",
-  "Pasta & Noodles",
-  "Snacks",
-  "Desserts",
-  "Other",
-];
+export const DISH_CATEGORIES = ["Appetizer", "Main Course", "Soup", "Salad", "Dessert", "Beverage"] as const;
+export type DishCategory = typeof DISH_CATEGORIES[number];
 
 export type ServingUnit = "serving" | "portion" | "piece" | "plate" | "bowl";
 
@@ -53,6 +41,7 @@ export interface Dish {
   category: DishCategory;
   /** data URL for uploaded images, or a path/URL for bundled images */
   image: string | null;
+  ingredients: string[];
   servingUnit: ServingUnit;
   costPerServing: number | null;
   sellingPrice: number | null;
@@ -66,9 +55,9 @@ export interface DailyRecord {
   dishId: string;
   /** local calendar date, YYYY-MM-DD */
   date: string;
-  prepared: number;
+  prepared: number | null;
   sold: number;
-  discarded: number;
+  discarded: number | null;
   /** false = the dish was not offered that day and is excluded from averages */
   wasOffered: boolean;
   notes: string;
@@ -86,11 +75,19 @@ export interface ForecastSettings {
   safetyAllowance: number;
 }
 
+export interface PreparationPlan {
+  dishId: string;
+  date: string;
+  adjustment: number;
+  isPrepared: boolean;
+}
+
 export interface AppData {
   version: number;
   restaurant: Restaurant | null;
   dishes: Dish[];
   records: DailyRecord[];
+  preparationPlans: PreparationPlan[];
   settings: ForecastSettings;
 }
 
@@ -99,7 +96,7 @@ export const DEFAULT_SETTINGS: ForecastSettings = {
   safetyAllowance: 0.1,
 };
 
-export const DATA_VERSION = 1;
+export const DATA_VERSION = 2;
 
 /** Minimum eligible recorded days required before a recommendation is shown. */
 export const MIN_ELIGIBLE_DAYS = 3;

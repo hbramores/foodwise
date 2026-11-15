@@ -1,9 +1,11 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   ClipboardList,
   History as HistoryIcon,
   LayoutGrid,
   PanelLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings as SettingsIcon,
   Store,
 } from "lucide-react";
@@ -20,12 +22,39 @@ const NAV = [
   { key: "settings" as RouteKey, label: "Settings", icon: SettingsIcon },
 ];
 
+/* Mobile bottom navigation: Daily Recording · Menu · History, with Menu centered. */
+const MOBILE_NAV = [
+  { key: "record" as RouteKey, label: "Daily Recording", icon: ClipboardList },
+  { key: "menu" as RouteKey, label: "Menu", icon: LayoutGrid },
+  { key: "history" as RouteKey, label: "History", icon: HistoryIcon },
+];
+
 export const SECTION_LABEL: Record<RouteKey, string> = {
   menu: "Menu",
   record: "Daily Recording",
   history: "History",
   settings: "Settings",
 };
+
+const SIDEBAR_KEY = "foodwise-ph:sidebar";
+
+function useSidebarCollapsed() {
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_KEY) === "collapsed";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_KEY, collapsed ? "collapsed" : "expanded");
+    } catch {
+      /* Storage unavailable; the in-session state still applies. */
+    }
+  }, [collapsed]);
+  return [collapsed, setCollapsed] as const;
+}
 
 function usePendingToday(): number {
   const { activeDishes, recordFor } = useData();
@@ -38,14 +67,19 @@ function usePendingToday(): number {
 function Sidebar({
   route,
   navigate,
+  collapsed,
+  onToggleCollapse,
   onNavigate,
 }: {
   route: RouteKey;
   navigate: (r: RouteKey) => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
   onNavigate?: () => void;
 }) {
   const { data } = useData();
   const pending = usePendingToday();
+  const collapseLabel = collapsed ? "Expand navigation" : "Collapse navigation";
 
   return (
     <aside className="side" aria-label="Primary">
@@ -56,9 +90,19 @@ function Sidebar({
           </span>
           <span className="brand__name">
             FoodWise PH
-            <small>Kitchen, in balance</small>
+            <small>Sales to servings</small>
           </span>
         </span>
+        <button
+          type="button"
+          className="side__collapse"
+          aria-label={collapseLabel}
+          aria-pressed={collapsed}
+          title={collapseLabel}
+          onClick={onToggleCollapse}
+        >
+          {collapsed ? <PanelLeftOpen className="ico" /> : <PanelLeftClose className="ico" />}
+        </button>
       </div>
 
       <nav className="side__nav">
@@ -72,6 +116,7 @@ function Sidebar({
               className="nav"
               data-route={item.key}
               aria-current={route === item.key ? "page" : undefined}
+              title={collapsed ? item.label : undefined}
               onClick={(e) => {
                 e.preventDefault();
                 navigate(item.key);
@@ -79,7 +124,7 @@ function Sidebar({
               }}
             >
               <Icon className="ico" aria-hidden="true" />
-              <span>{item.label}</span>
+              <span className="nav__label">{item.label}</span>
               {item.key === "record" && pending > 0 ? (
                 <span className="nav__badge">{pending}</span>
               ) : null}
@@ -108,7 +153,7 @@ function MobileTabBar({
   const pending = usePendingToday();
   return (
     <nav className="tabbar" aria-label="Primary">
-      {NAV.map((item) => {
+      {MOBILE_NAV.map((item) => {
         const Icon = item.icon;
         return (
           <a
@@ -152,10 +197,19 @@ export function AppShell({
 }) {
   const { data } = useData();
   const restaurantName = data.restaurant?.name ?? "FoodWise PH";
+  const [collapsed, setCollapsed] = useSidebarCollapsed();
 
   return (
-    <div className={sideOpen ? "app side-open" : "app"}>
-      <Sidebar route={route} navigate={navigate} onNavigate={() => setSideOpen(false)} />
+    <div
+      className={`app${sideOpen ? " side-open" : ""}${collapsed ? " app--collapsed" : ""}`}
+    >
+      <Sidebar
+        route={route}
+        navigate={navigate}
+        collapsed={collapsed}
+        onToggleCollapse={() => setCollapsed((v) => !v)}
+        onNavigate={() => setSideOpen(false)}
+      />
 
       {sideOpen ? (
         <div className="side-scrim" onClick={() => setSideOpen(false)} aria-hidden="true" />
@@ -182,6 +236,14 @@ export function AppShell({
               <i aria-hidden="true" />
               Saved on this device
             </span>
+            <IconButton
+              label="Settings"
+              ghost
+              className="top__settings"
+              onClick={() => navigate("settings")}
+            >
+              <SettingsIcon className="ico" />
+            </IconButton>
           </div>
         </header>
 

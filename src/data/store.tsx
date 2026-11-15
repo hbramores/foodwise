@@ -4,7 +4,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -14,6 +13,7 @@ import type {
   Dish,
   DishStatus,
   ForecastSettings,
+  PreparationPlan,
   RestaurantType,
 } from "../types";
 import { buildDemoData, clearData, emptyData, loadData, makeRestaurant, saveData } from "../lib/demo";
@@ -23,23 +23,24 @@ export interface DishInput {
   name: string;
   category: Dish["category"];
   image: string | null;
-  servingUnit: Dish["servingUnit"];
-  costPerServing: number | null;
-  sellingPrice: number | null;
+  ingredients: string[];
+
 }
 
 export interface RecordInput {
   dishId: string;
   date: string;
-  prepared: number;
+  prepared: number | null;
   sold: number;
-  discarded: number;
+  discarded: number | null;
   wasOffered: boolean;
   notes: string;
 }
 
 interface DataContextValue {
   data: AppData;
+  updateIngredients: (dishId: string, ingredients: string[]) => void;
+  updatePreparationPlan: (dishId: string, date: string, patch: Partial<Pick<PreparationPlan, "adjustment" | "isPrepared">>) => void;
   dishes: Dish[];
   records: DailyRecord[];
   activeDishes: Dish[];
@@ -65,15 +66,20 @@ const DataContext = createContext<DataContextValue | null>(null);
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(() => loadData());
-  const firstRun = useRef(true);
+  useEffect(() => {saveData(data);}, [data]);
 
-  useEffect(() => {
-    if (firstRun.current) {
-      firstRun.current = false;
-      return;
-    }
-    saveData(data);
-  }, [data]);
+  const updatePreparationPlan = useCallback((dishId: string, date: string, patch: Partial<Pick<PreparationPlan, "adjustment" | "isPrepared">>) => {
+    if (patch.adjustment !== undefined && !Number.isInteger(patch.adjustment)) return;
+    setData(d => {
+      const existing = d.preparationPlans.find(p => p.dishId === dishId && p.date === date);
+      const plan = {dishId, date, adjustment: 0, isPrepared: false, ...existing, ...patch};
+      return {...d, preparationPlans: [...d.preparationPlans.filter(p => p.dishId !== dishId || p.date !== date), plan]};
+    });
+  }, []);
+
+  const updateIngredients = useCallback((dishId: string, ingredients: string[]) => {
+    setData(d => ({...d, dishes: d.dishes.map(dish => dish.id === dishId ? {...dish, ingredients: ingredients.map(i => i.trim()).filter(Boolean), updatedAt: new Date().toISOString()} : dish)}));
+  }, []);
 
   const createRestaurant = useCallback((name: string, type: RestaurantType | "") => {
     setData((d) => ({ ...d, restaurant: makeRestaurant(name, type) }));
@@ -81,8 +87,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const updateRestaurant = useCallback((patch: { name?: string; type?: RestaurantType | "" }) => {
     setData((d) => {
-      if (!d.restaurant) return d;
-      return { ...d, restaurant: { ...d.restaurant, ...patch } };
+      return { ...d, restaurant: { ...(d.restaurant ?? makeRestaurant("Your restaurant", "")), ...patch } };
     });
   }, []);
 
@@ -93,9 +98,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       name: input.name.trim(),
       category: input.category,
       image: input.image,
-      servingUnit: input.servingUnit,
-      costPerServing: input.costPerServing,
-      sellingPrice: input.sellingPrice,
+      ingredients: input.ingredients.map(item => item.trim()).filter(Boolean),
+      servingUnit: "serving",
+      costPerServing: null,
+      sellingPrice: null,
       status: "active",
       createdAt: now,
       updatedAt: now,
@@ -114,9 +120,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
               name: input.name.trim(),
               category: input.category,
               image: input.image,
-              servingUnit: input.servingUnit,
-              costPerServing: input.costPerServing,
-              sellingPrice: input.sellingPrice,
+              ingredients: input.ingredients.map(item => item.trim()).filter(Boolean),
               updatedAt: new Date().toISOString(),
             }
           : dish
@@ -138,6 +142,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const records = [...d.records];
       const now = new Date().toISOString();
       for (const input of inputs) {
+        if (!Number.isSafeInteger(input.sold) || input.sold < 0) continue;
         const idx = records.findIndex(
           (r) => r.dishId === input.dishId && r.date === input.date
         );
@@ -196,6 +201,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const archivedDishes = data.dishes.filter((d) => d.status === "archived");
     return {
       data,
+      updatePreparationPlan,
+      updateIngredients,
       dishes: data.dishes,
       records: data.records,
       activeDishes,
@@ -218,6 +225,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     };
   }, [
     data,
+    updatePreparationPlan,
+    updateIngredients,
     createRestaurant,
     updateRestaurant,
     addDish,

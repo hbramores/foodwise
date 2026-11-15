@@ -1,21 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { ImagePlus, Trash2 } from "lucide-react";
-import type { Dish, DishCategory, ServingUnit } from "../types";
-import { DISH_CATEGORIES, SERVING_UNITS } from "../types";
-import { Modal } from "./overlays";
-import { Button, Field } from "./ui";
-import { resolveImageSrc } from "./DishImage";
+import { ImagePlus, Plus, Trash2 } from "lucide-react";
+import type { Dish, DishCategory } from "../types";
+import { DISH_CATEGORIES } from "../types";
 import type { DishInput } from "../data/store";
-import { parseNumberInput } from "../lib/format";
-
-const PRESET_IMAGES = [
-  { src: "dishes/fried-chicken.jpg", label: "Fried chicken" },
-  { src: "dishes/pork-adobo.jpg", label: "Adobo" },
-  { src: "dishes/filipino-spaghetti.jpg", label: "Spaghetti" },
-  { src: "dishes/beef-caldereta.jpg", label: "Caldereta" },
-  { src: "dishes/pancit-canton.jpg", label: "Pancit" },
-  { src: "dishes/chicken-inasal.jpg", label: "Inasal" },
-];
+import { Modal } from "./overlays";
+import { Button, Field, IconButton } from "./ui";
+import { resolveImageSrc } from "./DishImage";
 
 async function downscale(file: File, max = 900, quality = 0.78): Promise<string> {
   const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -48,268 +38,35 @@ async function downscale(file: File, max = 900, quality = 0.78): Promise<string>
   }
 }
 
-export function DishForm({
-  open,
-  dish,
-  onClose,
-  onSubmit,
-}: {
-  open: boolean;
-  dish: Dish | null;
-  onClose: () => void;
-  onSubmit: (input: DishInput) => void;
-}) {
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState<DishCategory>("Main Dishes");
-  const [servingUnit, setServingUnit] = useState<ServingUnit>("serving");
-  const [cost, setCost] = useState("");
-  const [price, setPrice] = useState("");
-  const [image, setImage] = useState<string | null>(null);
-  const [errors, setErrors] = useState<{ name?: string; cost?: string; price?: string }>({});
+export function DishForm({open,dish,onClose,onSubmit}: {open:boolean;dish:Dish|null;onClose:()=>void;onSubmit:(input:DishInput)=>void}) {
+  const [name,setName] = useState("");
+  const [category,setCategory] = useState<DishCategory | "">("");
+  const [image,setImage] = useState<string|null>(null);
+  const [ingredients,setIngredients] = useState<string[]>([]);
+  const [errors,setErrors] = useState<{name?:string;category?:string;image?:string;ingredients?:string}>({});
+  const [loading,setLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    if (dish) {
-      setName(dish.name);
-      setCategory(dish.category);
-      setServingUnit(dish.servingUnit);
-      setCost(dish.costPerServing === null ? "" : String(dish.costPerServing));
-      setPrice(dish.sellingPrice === null ? "" : String(dish.sellingPrice));
-      setImage(dish.image);
-    } else {
-      setName("");
-      setCategory("Main Dishes");
-      setServingUnit("serving");
-      setCost("");
-      setPrice("");
-      setImage(null);
-    }
-    setErrors({});
-  }, [open, dish]);
-
-  const picking = image && !PRESET_IMAGES.some((p) => p.src === image);
-
-  async function handleFile(file: File | undefined) {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setErrors((e) => ({ ...e, name: e.name }));
-      return;
-    }
-    try {
-      const small = await downscale(file);
-      setImage(small);
-    } catch {
-      /* ignore */
-    }
-  }
-
+  useEffect(() => {if (!open) return; setName(dish?.name ?? "");setCategory(dish?.category ?? "");setImage(dish?.image ?? null);setIngredients([...(dish?.ingredients ?? [])]);setErrors({});},[open,dish]);
   function submit() {
-    const nextErrors: typeof errors = {};
-    const trimmed = name.trim();
-    if (!trimmed) nextErrors.name = "Please enter a dish name.";
-    else if (trimmed.length > 80) nextErrors.name = "Dish name must be 80 characters or fewer.";
-
-    const costNum = cost.trim() === "" ? null : parseNumberInput(cost);
-    if (cost.trim() !== "" && (costNum === null || costNum < 0)) {
-      nextErrors.cost = "Enter a cost of zero or greater.";
-    }
-    const priceNum = price.trim() === "" ? null : parseNumberInput(price);
-    if (price.trim() !== "" && (priceNum === null || priceNum < 0)) {
-      nextErrors.price = "Enter a price of zero or greater.";
-    }
-
-    if (Object.keys(nextErrors).length > 0) {
-      setErrors(nextErrors);
-      return;
-    }
-
-    onSubmit({
-      name: trimmed,
-      category,
-      image,
-      servingUnit,
-      costPerServing: costNum,
-      sellingPrice: priceNum,
-    });
-    onClose();
+    const next: typeof errors = {};
+    if (!name.trim()) next.name = "Enter a dish name.";
+    if (!category) next.category = "Choose a category.";
+    if (ingredients.some(item => !item.trim())) next.ingredients = "Name each ingredient or remove empty rows.";
+    setErrors(next);
+    if (Object.keys(next).length || !category) return;
+    onSubmit({name:name.trim(),category,image,ingredients:ingredients.map(item => item.trim())});onClose();
   }
-
-  const preview = resolveImageSrc(image);
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={dish ? "Edit dish" : "Add a dish"}
-      subtitle={
-        dish
-          ? "Update this dish. Its sales history stays linked."
-          : "Add a dish to your menu to start recording and forecasting."
-      }
-      labelledById="dish-form-title"
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={submit}>
-            {dish ? "Save changes" : "Add dish"}
-          </Button>
-        </>
-      }
-    >
-      <div className="mform__grid">
-        <Field label="Dish name" htmlFor="dish-name" error={errors.name} wide>
-          <input
-            id="dish-name"
-            className="input"
-            value={name}
-            maxLength={80}
-            placeholder="Fried Chicken"
-            autoComplete="off"
-            onChange={(e) => setName(e.target.value)}
-          />
-        </Field>
-
-        <Field label="Category" htmlFor="dish-category">
-          <select
-            id="dish-category"
-            className="select"
-            value={category}
-            onChange={(e) => setCategory(e.target.value as DishCategory)}
-          >
-            {DISH_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Serving unit" htmlFor="dish-unit" hint="Used to label quantities.">
-          <select
-            id="dish-unit"
-            className="select"
-            value={servingUnit}
-            onChange={(e) => setServingUnit(e.target.value as ServingUnit)}
-          >
-            {SERVING_UNITS.map((u) => (
-              <option key={u} value={u}>
-                {u}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Cost per serving (optional)" htmlFor="dish-cost" error={errors.cost}>
-          <input
-            id="dish-cost"
-            className="input"
-            value={cost}
-            inputMode="decimal"
-            placeholder="55"
-            onChange={(e) => setCost(e.target.value)}
-          />
-        </Field>
-
-        <Field label="Selling price (optional)" htmlFor="dish-price" error={errors.price}>
-          <input
-            id="dish-price"
-            className="input"
-            value={price}
-            inputMode="decimal"
-            placeholder="95"
-            onChange={(e) => setPrice(e.target.value)}
-          />
-        </Field>
-
-        <Field label="Dish image (optional)" wide hint="Upload a photo, or pick a sample below.">
-          <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
-            <div
-              style={{
-                width: 116,
-                height: 92,
-                borderRadius: 14,
-                overflow: "hidden",
-                border: "1px solid var(--color-line)",
-                background: "var(--color-cream)",
-                flex: "none",
-                display: "grid",
-                placeItems: "center",
-              }}
-            >
-              {preview ? (
-                <img src={preview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              ) : (
-                <ImagePlus style={{ width: 26, height: 26, color: "var(--color-caramel)" }} />
-              )}
-            </div>
-
-            <div style={{ display: "grid", gap: 8 }}>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <Button variant="ghost" size="sm" onClick={() => fileRef.current?.click()}>
-                  {image ? "Replace photo" : "Upload photo"}
-                </Button>
-                {image ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    icon={<Trash2 className="ico" style={{ width: 15, height: 15 }} />}
-                    onClick={() => setImage(null)}
-                  >
-                    Remove
-                  </Button>
-                ) : null}
-              </div>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={(e) => {
-                  void handleFile(e.target.files?.[0]);
-                  e.target.value = "";
-                }}
-              />
-              <span className="field__hint">
-                {picking
-                  ? "Uploaded photos are stored in this browser only."
-                  : "Sample photos are included for the prototype."}
-              </span>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-            {PRESET_IMAGES.map((p) => (
-              <button
-                key={p.src}
-                type="button"
-                aria-label={`Use ${p.label} photo`}
-                title={`Use ${p.label} photo`}
-                onClick={() => setImage(p.src)}
-                style={{
-                  width: 54,
-                  height: 44,
-                  borderRadius: 10,
-                  overflow: "hidden",
-                  border:
-                    image === p.src
-                      ? "2px solid var(--color-caramel)"
-                      : "1px solid var(--color-line)",
-                  background: "var(--color-cream)",
-                }}
-              >
-                <img
-                  src={resolveImageSrc(p.src) ?? ""}
-                  alt=""
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              </button>
-            ))}
-          </div>
-        </Field>
-      </div>
-    </Modal>
-  );
+  return <Modal open={open} onClose={onClose} title={dish ? "Edit dish" : "Add dish"} subtitle="Dish details and ingredients" labelledById="dish-form-title" footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button type="submit" form="dish-editor" disabled={loading}>Save Dish</Button></>}>
+    <form id="dish-editor" onSubmit={e => {e.preventDefault();submit();}} className="dish-editor-v2">
+      <Field label="Dish Name" htmlFor="dish-name" error={errors.name}><input id="dish-name" className="input" value={name} maxLength={80} onChange={e => setName(e.target.value)} aria-invalid={Boolean(errors.name)} /></Field>
+      <Field label="Category" htmlFor="dish-category" error={errors.category}><select id="dish-category" className="select" value={category} onChange={e => setCategory(e.target.value as DishCategory)}><option value="">Choose a category</option>{DISH_CATEGORIES.map(c => <option key={c}>{c}</option>)}</select></Field>
+      <div className="dish-photo-field"><span className="field__label">Dish Image <small>(optional)</small></span><div className="dish-photo-field__controls">
+        {image ? <img src={resolveImageSrc(image) ?? undefined} alt="Dish preview" /> : null}
+        <Button variant="ghost" size="sm" icon={<ImagePlus className="ico" />} onClick={() => fileRef.current?.click()} disabled={loading}>{loading ? "Loading image…" : "Upload image"}</Button>
+        {image ? <Button variant="soft" size="sm" onClick={() => setImage(null)}>Remove image</Button> : null}
+        <input ref={fileRef} type="file" accept="image/*" className="sr" aria-label="Choose dish image" onChange={async e => {const file=e.target.files?.[0];if (!file) return;if (!file.type.startsWith("image/")) {setErrors(v => ({...v,image:"Choose an image file."}));return;}setLoading(true);try {setImage(await downscale(file));setErrors(v => ({...v,image:undefined}));}catch {setErrors(v => ({...v,image:"Could not read this image. Try another file."}));}finally{setLoading(false);e.target.value="";}}} />
+      </div>{errors.image ? <p className="field__err" role="alert">{errors.image}</p> : null}</div>
+      <div><h3 className="field__label">Ingredients</h3><div className="ingredient-editor">{ingredients.map((item,i) => <div className="ingredient-editor__row" key={i}><input className="input" value={item} aria-label={`Ingredient ${i+1}`} onChange={e => setIngredients(prev => prev.map((value,index) => index === i ? e.target.value : value))} /><IconButton label={`Remove ingredient ${i+1}`} ghost size="sm" onClick={() => setIngredients(prev => prev.filter((_,index) => index !== i))}><Trash2 className="ico" /></IconButton></div>)}</div>{errors.ingredients ? <p className="field__err" role="alert">{errors.ingredients}</p> : null}<Button variant="ghost" size="sm" icon={<Plus className="ico" />} onClick={() => setIngredients(prev => [...prev,""])}>Add ingredient</Button></div>
+    </form>
+  </Modal>;
 }

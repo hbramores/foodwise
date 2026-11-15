@@ -19,7 +19,7 @@ export function DateSelector({
 }) {
   const inputId = id ?? "datesel";
   return (
-    <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+    <div className="date-selector" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
       {label ? (
         <label className="field__label" htmlFor={inputId} style={{ whiteSpace: "nowrap" }}>
           {label}

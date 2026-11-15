@@ -1,58 +1,103 @@
-﻿[
-    {
-        "slug":  "fried-chicken",
-        "title":  "Fried-Chicken-Set.jpg",
-        "artist":  "Evan-Amos",
-        "license":  "CC0",
-        "licenseUrl":  "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-        "source":  "https://commons.wikimedia.org/wiki/File%3AFried-Chicken-Set.jpg"
-    },
-    {
-        "slug":  "pork-adobo",
-        "title":  "Pork Adobo with Sinangag.jpg",
-        "artist":  "pulaw",
-        "license":  "CC BY 2.0",
-        "licenseUrl":  "https://creativecommons.org/licenses/by/2.0",
-        "source":  "https://commons.wikimedia.org/wiki/File%3APork%20Adobo%20with%20Sinangag.jpg"
-    },
-    {
-        "slug":  "filipino-spaghetti",
-        "title":  "Filipino style spaghetti.jpg",
-        "artist":  "RightCowLeftCoast",
-        "license":  "CC BY-SA 4.0",
-        "licenseUrl":  "https://creativecommons.org/licenses/by-sa/4.0",
-        "source":  "https://commons.wikimedia.org/wiki/File%3AFilipino%20style%20spaghetti.jpg"
-    },
-    {
-        "slug":  "beef-caldereta",
-        "title":  "Beef Caldereta, Feb 2024.jpg",
-        "artist":  "Ralff Nestor Nacor",
-        "license":  "CC BY-SA 4.0",
-        "licenseUrl":  "https://creativecommons.org/licenses/by-sa/4.0",
-        "source":  "https://commons.wikimedia.org/wiki/File%3ABeef%20Caldereta%2C%20Feb%202024.jpg"
-    },
-    {
-        "slug":  "pancit-canton",
-        "title":  "Pancit Canton.jpg",
-        "artist":  "mooglet",
-        "license":  "CC BY-SA 2.0",
-        "licenseUrl":  "https://creativecommons.org/licenses/by-sa/2.0",
-        "source":  "https://commons.wikimedia.org/wiki/File%3APancit%20Canton.jpg"
-    },
-    {
-        "slug":  "chicken-inasal",
-        "title":  "Chicken Inasal + Rice, Jun 2024.jpg",
-        "artist":  "Ralff Nestor Nacor",
-        "license":  "CC BY-SA 4.0",
-        "licenseUrl":  "https://creativecommons.org/licenses/by-sa/4.0",
-        "source":  "https://commons.wikimedia.org/wiki/File%3AChicken%20Inasal%20%2B%20Rice%2C%20Jun%202024.jpg"
-    },
-    {
-        "slug":  "hero",
-        "title":  "Filipino barbecue restaurant 2023.jpg",
-        "artist":  "Obsidian Soul",
-        "license":  "CC0",
-        "licenseUrl":  "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-        "source":  "https://commons.wikimedia.org/wiki/File%3AFilipino%20barbecue%20restaurant%202023.jpg"
-    }
+[
+  {
+    "slug": "fried-chicken",
+    "title": "Fried-Chicken-Set.jpg",
+    "artist": "Evan-Amos",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "source": "https://commons.wikimedia.org/wiki/File%3AFried-Chicken-Set.jpg"
+  },
+  {
+    "slug": "pork-adobo",
+    "title": "Pork Adobo with Sinangag.jpg",
+    "artist": "pulaw",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File%3APork%20Adobo%20with%20Sinangag.jpg"
+  },
+  {
+    "slug": "filipino-spaghetti",
+    "title": "Filipino style spaghetti.jpg",
+    "artist": "RightCowLeftCoast",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File%3AFilipino%20style%20spaghetti.jpg"
+  },
+  {
+    "slug": "beef-caldereta",
+    "title": "Beef Caldereta, Feb 2024.jpg",
+    "artist": "Ralff Nestor Nacor",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File%3ABeef%20Caldereta%2C%20Feb%202024.jpg"
+  },
+  {
+    "slug": "pancit-canton",
+    "title": "Pancit Canton.jpg",
+    "artist": "mooglet",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File%3APancit%20Canton.jpg"
+  },
+  {
+    "slug": "chicken-inasal",
+    "title": "Chicken Inasal + Rice, Jun 2024.jpg",
+    "artist": "Ralff Nestor Nacor",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File%3AChicken%20Inasal%20%2B%20Rice%2C%20Jun%202024.jpg"
+  },
+  {
+    "slug": "hero",
+    "title": "Filipino barbecue restaurant 2023.jpg",
+    "artist": "Obsidian Soul",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "source": "https://commons.wikimedia.org/wiki/File%3AFilipino%20barbecue%20restaurant%202023.jpg"
+  },
+  {
+    "license": "CC BY-SA 4.0",
+    "changes": "Resized thumbnail; cropped by the interface",
+    "artist": "Aerous",
+    "title": "Fried calamares.jpg",
+    "slug": "calamares",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Fried%20calamares.jpg"
+  },
+  {
+    "license": "CC BY-SA 3.0",
+    "changes": "Resized thumbnail; cropped by the interface",
+    "artist": "Redeemer|Vodesnet",
+    "title": "Cream Mushroom soup 2.jpg",
+    "slug": "mushroom-soup",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Cream%20Mushroom%20soup%202.jpg"
+  },
+  {
+    "license": "CC BY 2.0",
+    "changes": "Resized thumbnail; cropped by the interface",
+    "artist": "Wheeler Cowperthwaite",
+    "title": "German potato salad 24.jpg",
+    "slug": "potato-salad",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:German%20potato%20salad%2024.jpg"
+  },
+  {
+    "license": "CC BY-SA 3.0",
+    "changes": "Resized thumbnail; cropped by the interface",
+    "artist": "Richard Huber",
+    "title": "Affogato al Caffe.jpg",
+    "slug": "affogato",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Affogato%20al%20Caffe.jpg"
+  },
+  {
+    "license": "CC BY 2.0",
+    "changes": "Resized thumbnail; cropped by the interface",
+    "artist": "cogdogblog",
+    "title": "2009-365-146 Water Melon Smoothie (3570991499).jpg",
+    "slug": "watermelon-smoothie",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:2009-365-146%20Water%20Melon%20Smoothie%20%283570991499%29.jpg"
+  }
 ]

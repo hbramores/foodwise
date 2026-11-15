@@ -27,6 +27,28 @@ function useEnter(open: boolean): boolean {
   return entered;
 }
 
+function useDialogFocus(panelRef: {current: HTMLDivElement | null}, open: boolean) {
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const panel = panelRef.current;
+    if (!panel) return;
+    const selector = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex="0"]';
+    (panel.querySelector<HTMLElement>(selector) ?? panel).focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const elements = [...panel.querySelectorAll<HTMLElement>(selector)].filter(el => el.getClientRects().length > 0);
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      if (!first) {event.preventDefault(); panel.focus(); return;}
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === panel)) {event.preventDefault(); last.focus();}
+      if (!event.shiftKey && document.activeElement === last) {event.preventDefault(); first.focus();}
+    };
+    panel.addEventListener("keydown", onKey);
+    return () => {panel.removeEventListener("keydown", onKey); if (previous?.isConnected) previous.focus();};
+  }, [open, panelRef]);
+}
+
 /* -------------------------------------------------------------------- Modal */
 
 export function Modal({
@@ -51,14 +73,7 @@ export function Modal({
   useBodyScrollLock(open);
   useEscape(onClose, open);
 
-  useEffect(() => {
-    if (open && panelRef.current) {
-      const focusable = panelRef.current.querySelector<HTMLElement>(
-        "input, select, textarea, button, [href], [tabindex]:not([tabindex='-1'])"
-      );
-      focusable?.focus();
-    }
-  }, [open]);
+  useDialogFocus(panelRef, open);
 
   if (!open) return null;
 
@@ -82,6 +97,8 @@ export function Modal({
           role="dialog"
           aria-modal="true"
           aria-labelledby={labelledById}
+          aria-label={labelledById ? undefined : title}
+          tabIndex={-1}
           style={{ pointerEvents: "auto", maxHeight: "92dvh", overflowY: "auto" }}
         >
           <div className="mform">
@@ -124,11 +141,7 @@ export function Drawer({
   useBodyScrollLock(open);
   useEscape(onClose, open);
 
-  useEffect(() => {
-    if (open && panelRef.current) {
-      panelRef.current.focus();
-    }
-  }, [open]);
+  useDialogFocus(panelRef, open);
 
   if (!open) return null;
 

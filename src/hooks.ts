@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export const ROUTES = ["menu", "record", "history", "settings"] as const;
 export type RouteKey = (typeof ROUTES)[number];
@@ -8,17 +8,30 @@ function parseHash(): RouteKey {
   return (ROUTES as readonly string[]).includes(h) ? (h as RouteKey) : "menu";
 }
 
-export function useRoute() {
+export function useRoute(beforeExternalNavigation?: (next: RouteKey) => boolean) {
   const [route, setRoute] = useState<RouteKey>(() => parseHash());
 
+  const currentRoute = useRef(route);
+  const externalGuard = useRef(beforeExternalNavigation);
+  externalGuard.current = beforeExternalNavigation;
   useEffect(() => {
-    const onHash = () => setRoute(parseHash());
+    const onHash = () => {
+      const next = parseHash();
+      if (next === currentRoute.current) return;
+      if (externalGuard.current && !externalGuard.current(next)) {
+        window.history.replaceState(null, "", `#/${currentRoute.current}`);
+        return;
+      }
+      currentRoute.current = next;
+      setRoute(next);
+    };
     window.addEventListener("hashchange", onHash);
     if (!window.location.hash) window.location.replace("#/menu");
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
   const navigate = useCallback((next: RouteKey) => {
+    currentRoute.current = next;
     if (window.location.hash !== `#/${next}`) {
       window.location.hash = `#/${next}`;
     }

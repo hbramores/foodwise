@@ -1,89 +1,55 @@
-import { buildDemoData } from "../src/lib/demo";
-import { computeForecast, estimatedAvoidableCost } from "../src/lib/forecast";
-import { todayISO } from "../src/lib/date";
-
-const data = buildDemoData();
-const today = todayISO();
-
-const expected: Record<string, number> = {
-  "Fried Chicken": 46,
-  "Pork Adobo": 39,
-  "Filipino Spaghetti": 44,
-  "Beef Caldereta": 25,
-  "Pancit Canton": 33,
-  "Chicken Inasal": 36,
-};
-
-let failures = 0;
-
-console.log("restaurant:", data.restaurant?.name, "| period:", data.settings.historicalPeriod);
-console.log("dishes:", data.dishes.length, "records:", data.records.length);
-
-for (const dish of data.dishes) {
-  const recs = data.records.filter((r) => r.dishId === dish.id);
-  const f = computeForecast(recs, data.settings, today);
-  const unit = dish.servingUnit;
-  const ok = f.recommended === expected[dish.name];
-  if (!ok) failures += 1;
-  const cost = estimatedAvoidableCost(f.potentialReduction, dish.costPerServing);
-  console.log(
-    `${ok ? "PASS" : "FAIL"} ${dish.name.padEnd(18)} avg=${f.averageSales.toFixed(0).padStart(3)} ` +
-      `rec=${String(f.recommended).padStart(3)} (expected ${expected[dish.name]}) ` +
-      `avgPrep=${f.averagePreparedCeil} reduction=${f.potentialReduction} ` +
-      `cost=${cost === null ? "n/a" : "PHP" + cost} eligible=${f.eligibleDays}/${f.totalEligibleDays}`
-  );
+import {buildDemoData,emptyData,loadData,saveData} from "../src/lib/demo";
+import {computeForecast,recentRecordedDates,saleForDate} from "../src/lib/forecast";
+import {validateSalesInput} from "../src/lib/recordValidation";
+import {addDaysISO,todayISO} from "../src/lib/date";
+import type {DailyRecord} from "../src/types";
+const data=buildDemoData();
+let failures=0;
+function check(condition:boolean,label:string) {console.log(`${condition ? "PASS" : "FAIL"} ${label}`);if(!condition)failures++;}
+const expected=[10,42,17,23,16,17];
+const supplied=[[12,8,10,11,9],[41,47,36,44,42],[18,22,11,16,18],[23,18,28,21,25],[21,16,11,18,14],[16,18,16,20,15]];
+const dates=recentRecordedDates(data.records);
+check(dates.length===5 && data.records.length===30,"Complete five-day seed data");
+check(data.dishes.length===6 && data.dishes.map(d=>d.ingredients.length).join(",")==="10,8,9,8,2,4","Six mandatory dishes and complete ingredient lists");
+for(const [i,dish] of data.dishes.entries()) {
+ const result=computeForecast(data.records,dish.id,dates);
+ check(result.values.join(",")===supplied[i].join(","),`Exact sales: ${dish.name}`);
+ check(result.recommended===expected[i],`Shared Menu / History average: ${dish.name} = ${expected[i]}`);
 }
-
-// total recommended
-const total = data.dishes.reduce(
-  (sum, dish) =>
-    sum +
-    (computeForecast(
-      data.records.filter((r) => r.dishId === dish.id),
-      data.settings,
-      today
-    ).recommended ?? 0),
-  0
-);
-console.log("total recommended:", total, "(expected 223)");
-if (total !== 223) failures += 1;
-
-// insufficient-data rule: a brand new dish with 2 records yields no recommendation
-const sparse = data.records.slice(0, 2).map((r) => ({ ...r, dishId: "x" }));
-const sparseForecast = computeForecast(sparse, data.settings, today);
-console.log("sparse (2 records) recommended:", sparseForecast.recommended, "(expected null)");
-if (sparseForecast.recommended !== null) failures += 1;
-
-// not-offered records are excluded from averages
-const offered = computeForecast(
-  data.records.filter((r) => r.dishId === "dish_fried_chicken" && r.date < today).slice(0, 5),
-  { historicalPeriod: 7, safetyAllowance: 0.1 },
-  today
-);
-const withOff = computeForecast(
-  data.records
-    .filter((r) => r.dishId === "dish_fried_chicken" && r.date < today)
-    .slice(0, 5)
-    .map((r, i) => (i === 0 ? { ...r, wasOffered: false } : r)),
-  { historicalPeriod: 7, safetyAllowance: 0.1 },
-  today
-);
-console.log(
-  "not-offered exclusion:",
-  offered.eligibleDays,
-  "->",
-  withOff.eligibleDays,
-  "(expected 5 -> 4)"
-);
-if (!(offered.eligibleDays === 5 && withOff.eligibleDays === 4)) failures += 1;
-
-// Zero sales count as a recorded day; same-day and future sales never enter a forecast.
-const sample = data.records.filter(r => r.dishId === data.dishes[0].id).slice(0, 3);
-const zeros = computeForecast(sample.map(r => ({...r, sold: 0})), data.settings, today);
-if (zeros.eligibleDays !== 3 || zeros.recommended !== 0) failures += 1;
-const boundary = computeForecast([...sample, {...sample[0], date: today, sold: 9999}], data.settings, today);
-if (boundary.eligibleDays !== 3 || boundary.totalSold !== sample.reduce((sum,r) => sum+r.sold,0)) failures += 1;
-console.log("Zero-sales and forecast-date boundary checks:", zeros.recommended === 0 && boundary.eligibleDays === 3 ? "PASS" : "FAIL");
-
-console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} CHECK(S) FAILED`);
-process.exit(failures === 0 ? 0 : 1);
+const first=data.dishes[0].id;
+const one=data.records.filter(r=>r.dishId===first).slice(0,1);
+check(computeForecast(one,first).recommended===12,"One available record produces a limited-history recommendation");
+const none=computeForecast([],first);
+check(none.recommended===null && none.averageSales===null,"No invented recommendation with no records");
+const zeros=one.map(r=>({...r,sold:0}));
+check(computeForecast(zeros,first).recommended===0,"Recorded zero is included");
+const sparse=data.records.filter(r=>r.dishId!==first || r.date===dates[4]);
+const sparseResult=computeForecast(sparse,first);
+check(sparseResult.eligibleDays===1 && sparseResult.recommended===9 && sparseResult.values.filter(v=>v===null).length===4,"Missing cells show gaps and average divides only by available records");
+const old:DailyRecord={...one[0],id:"old",date:addDaysISO(dates[0],-10),sold:999};
+check(computeForecast([...sparse,old],first).recommended===9,"Shared restaurant dates prevent backfilling missing cells from older dish dates");
+const sixth:DailyRecord={...one[0],id:"new",date:todayISO(),sold:20};
+const rolled=recentRecordedDates([...data.records,sixth]);
+check(rolled.join(",")===[...dates.slice(1),todayISO()].join(","),"Sixth day rolls the five-date window chronologically");
+check(data.records.length===30 && computeForecast([...data.records,sixth],first).recommended===12,"Rolling recommendation updates while original history is kept");
+const edited=data.records.map(r=>r.dishId===first && r.date===dates[0] ? {...r,sold:22} : r);
+check(computeForecast(edited,first).recommended===12,"Editing sales recalculates the rounded average");
+const deleted=data.records.filter(r=>!(r.dishId===first && r.date===dates[0]));
+check(computeForecast(deleted,first).eligibleDays===4 && computeForecast(deleted,first).recommended===10,"Deleting a sale updates count and average without deleting other sales");
+const half=[{...one[0],sold:1},{...one[0],id:"half2",date:addDaysISO(one[0].date,1),sold:2}];
+check(computeForecast(half,first).recommended===2,"Standard nonnegative half-up rounding");
+check(saleForDate(data.records,first,dates[0])?.sold===12,"Lookup uses stable dish and date identifiers");
+check(!validateSalesInput("0").error && validateSalesInput("0").quantity===0,"Zero is valid input");
+check(validateSalesInput("").quantity===null && !validateSalesInput("").error,"Blank stays distinct from zero");
+check(Boolean(validateSalesInput("",false).error),"Clearing an existing record requires explicit removal");
+for(const invalid of ["-1","1.5","1e2","hello","Infinity","9007199254740992"]) check(Boolean(validateSalesInput(invalid).error),`Reject invalid quantity: ${invalid}`);
+let stored:string|null=null;
+Object.defineProperty(globalThis,"localStorage",{value:{getItem:()=>stored,setItem:(_key:string,value:string)=>{stored=value;},removeItem:()=>{stored=null;}},configurable:true});
+const changed=structuredClone(data);changed.dishes[0].name="Renamed Calamares";changed.dishes[0].ingredients=["Edited squid","Lemon"];changed.dishes[0].status="archived";
+saveData(changed);const restored=loadData();
+check(restored.dishes[0].name==="Renamed Calamares" && restored.dishes[0].ingredients[0]==="Edited squid","Dish edits and ingredients persist after refresh");
+check(restored.dishes[0].status==="archived" && restored.records.length===30,"Archiving preserves linked historical sales");
+check(JSON.stringify(restored.records)===JSON.stringify(changed.records),"Refresh never replaces existing user sales with demo data");
+saveData(emptyData());check(loadData().dishes.length===0 && loadData().records.length===0,"Clear data stays empty after refresh without reseeding or a welcome gate");
+console.log(failures ? `${failures} CHECK(S) FAILED` : "ALL CHECKS PASSED");
+process.exit(failures?1:0);

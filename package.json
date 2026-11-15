@@ -1,9 +1,9 @@
 {
   "name": "foodwise-ph",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
-  "description": "FoodWise PH \u00e2\u20ac\u201d a restaurant food production forecasting web app (frontend prototype)",
+  "description": "FoodWise PH \u2014 a frontend-only restaurant sales forecasting system",
   "scripts": {
     "dev": "vite",
     "build": "node node_modules/typescript/bin/tsc -b && node node_modules/vite/bin/vite.js build",

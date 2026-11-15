@@ -1,101 +1,27 @@
-import type { DailyRecord, ForecastSettings } from "../types";
-import { MIN_ELIGIBLE_DAYS } from "../types";
+import type { DailyRecord } from "../types";
+import { todayISO } from "./date";
 
 export interface ForecastResult {
-  eligibleDays: number;
-  totalEligibleDays: number;
-  /** Most recent eligible records, newest first, limited to the period window. */
+  dates: string[];
+  values: (number | null)[];
   usedRecords: DailyRecord[];
   totalSold: number;
-  totalPrepared: number;
-  averageSales: number;
-  averagePrepared: number;
+  averageSales: number | null;
   recommended: number | null;
-  averagePreparedCeil: number | null;
-  potentialReduction: number | null;
-  hasEnoughData: boolean;
+  eligibleDays: number;
 }
 
-function byDateDesc(a: DailyRecord, b: DailyRecord): number {
-  if (a.date === b.date) return 0;
-  return a.date < b.date ? 1 : -1;
+/** One shared restaurant window. Missing dish records never pull in older dates. */
+export function recentRecordedDates(records: DailyRecord[], through = todayISO()): string[] {
+  return [...new Set(records.filter(r => r.wasOffered && r.date <= through && Number.isFinite(r.sold)).map(r => r.date))].sort().slice(-5);
 }
-
-/**
- * Records eligible for a forecast dated `forecastDate`:
- *  - the dish was offered (wasOffered === true)
- *  - the record date is strictly before the forecast date
- *  - newest first
- */
-export function eligibleRecords(
-  records: DailyRecord[],
-  forecastDate: string
-): DailyRecord[] {
-  return records
-    .filter((r) => r.wasOffered && r.date < forecastDate)
-    .sort(byDateDesc);
+export function saleForDate(records: DailyRecord[], dishId: string, date: string): DailyRecord | undefined {
+  return records.find(r => r.dishId === dishId && r.date === date && r.wasOffered);
 }
-
-export function computeForecast(
-  records: DailyRecord[],
-  settings: ForecastSettings,
-  forecastDate: string
-): ForecastResult {
-  const eligible = eligibleRecords(records, forecastDate);
-  const used = eligible.slice(0, settings.historicalPeriod);
-  const count = used.length;
-
-  const totalSold = used.reduce((s, r) => s + r.sold, 0);
-  const totalPrepared = used.reduce((s, r) => s + r.prepared, 0);
-  const averageSales = count > 0 ? totalSold / count : 0;
-  const averagePrepared = count > 0 ? totalPrepared / count : 0;
-
-  const hasEnoughData = count >= MIN_ELIGIBLE_DAYS;
-  const recommended = hasEnoughData
-    ? Math.ceil(averageSales * (1 + settings.safetyAllowance))
-    : null;
-  const averagePreparedCeil = count > 0 ? Math.ceil(averagePrepared) : null;
-
-  const potentialReduction =
-    recommended !== null && averagePreparedCeil !== null
-      ? Math.max(0, averagePreparedCeil - recommended)
-      : null;
-
-  return {
-    eligibleDays: count,
-    totalEligibleDays: eligible.length,
-    usedRecords: used,
-    totalSold,
-    totalPrepared,
-    averageSales,
-    averagePrepared,
-    recommended,
-    averagePreparedCeil,
-    potentialReduction,
-    hasEnoughData,
-  };
-}
-
-export function unsold(prepared: number, sold: number): number {
-  return prepared - sold;
-}
-
-export function retained(
-  prepared: number,
-  sold: number,
-  discarded: number
-): number {
-  return prepared - sold - discarded;
-}
-
-/** Estimated avoidable preparation cost, or null when no usable cost exists. */
-export function estimatedAvoidableCost(
-  potentialReduction: number | null,
-  costPerServing: number | null
-): number | null {
-  if (potentialReduction === null || potentialReduction <= 0) return null;
-  if (costPerServing === null || !Number.isFinite(costPerServing) || costPerServing <= 0) {
-    return null;
-  }
-  return potentialReduction * costPerServing;
+export function computeForecast(records: DailyRecord[], dishId: string, dates = recentRecordedDates(records)): ForecastResult {
+  const usedRecords = dates.flatMap(date => {const record = saleForDate(records,dishId,date); return record ? [record] : [];});
+  const values = dates.map(date => saleForDate(records,dishId,date)?.sold ?? null);
+  const totalSold = usedRecords.reduce((sum,r) => sum+r.sold,0);
+  const averageSales = usedRecords.length ? totalSold/usedRecords.length : null;
+  return {dates,values,usedRecords,totalSold,averageSales,recommended:averageSales === null ? null : Math.round(averageSales),eligibleDays:usedRecords.length};
 }
