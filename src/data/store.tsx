@@ -23,6 +23,7 @@ import {
   applyStockMovement,
   checkout as checkoutAction,
   closeOperatingDay,
+  prepareMany as prepareManyAction,
   prepareServings,
   reopenOperatingDay,
   setIngredientStatus as setIngredientStatusAction,
@@ -35,7 +36,9 @@ import {
   type CheckoutResult,
   type CloseResult,
   type IngredientInput,
+  type PreparationEntry,
   type PreparationResult,
+  type PrepareManyResult,
   type ProductInput,
   type RecipeLineInput,
 } from "../lib/actions";
@@ -51,6 +54,7 @@ interface StoreValue {
   setIngredientStatus: (id: string, status: RecordStatus) => void;
   moveStock: (id: string, kind: MovementKind, qty: number, note: string) => void;
   prepare: (productId: string, servings: number, override?: boolean) => PreparationResult;
+  prepareMany: (entries: PreparationEntry[], override?: boolean) => PrepareManyResult;
   checkout: (input: CheckoutInput) => CheckoutResult;
   setTxnStatus: (id: string, status: POSTransaction["status"], note: string) => void;
   closeDay: (date: string, lines: ClosingLineItem[]) => CloseResult;
@@ -117,6 +121,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       moveStock: (id, kind, qty, note) => apply(applyStockMovement(current(), id, kind, qty, note)),
       prepare: (productId, servings, override) => {
         const result = prepareServings(current(), { productId, servings, override });
+        if (result.ok) apply(result.data);
+        return result;
+      },
+      prepareMany: (entries, override) => {
+        const result = prepareManyAction(current(), entries, override);
         if (result.ok) apply(result.data);
         return result;
       },

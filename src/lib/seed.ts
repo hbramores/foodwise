@@ -18,6 +18,7 @@ import {
 import { addDaysISO, lastNDates, manilaToday } from "./date";
 import { convertQty, round3 } from "./units";
 import { uid } from "./id";
+import { PRODUCT_IMAGES } from "./images";
 
 /* ------------------------------------------------------------- ingredients */
 
@@ -74,13 +75,18 @@ interface ProductSeed {
   description: string;
 }
 
+/** Seeded photographs come from the shared `src/images/menu` catalogue. */
+function seedImage(id: string): string {
+  return PRODUCT_IMAGES[id] ?? "";
+}
+
 export const PRODUCT_SEED: ProductSeed[] = [
   {
     id: "p-calamares",
     name: "Calamares",
     category: "Appetizer",
     price: 149,
-    image: "/dishes/calamares.jpg",
+    image: seedImage("p-calamares"),
     description: "Crisp battered squid rings with a spicy dip and a squeeze of lemon.",
   },
   {
@@ -88,7 +94,7 @@ export const PRODUCT_SEED: ProductSeed[] = [
     name: "Fried Chicken",
     category: "Main Course",
     price: 129,
-    image: "/dishes/fried-chicken.jpg",
+    image: seedImage("p-fried-chicken"),
     description: "Buttermilk-brined chicken fried golden, served with gravy.",
   },
   {
@@ -96,7 +102,7 @@ export const PRODUCT_SEED: ProductSeed[] = [
     name: "Creamy Mushroom Soup",
     category: "Soup",
     price: 89,
-    image: "/dishes/mushroom-soup.jpg",
+    image: seedImage("p-mushroom-soup"),
     description: "Velvety mushroom soup finished with cream and fresh herbs.",
   },
   {
@@ -104,7 +110,7 @@ export const PRODUCT_SEED: ProductSeed[] = [
     name: "German Potato Salad",
     category: "Salad",
     price: 99,
-    image: "/dishes/potato-salad.jpg",
+    image: seedImage("p-potato-salad"),
     description: "Warm potato salad with bacon, onion and a tangy mustard dressing.",
   },
   {
@@ -112,7 +118,7 @@ export const PRODUCT_SEED: ProductSeed[] = [
     name: "Affogato",
     category: "Dessert",
     price: 119,
-    image: "/dishes/affogato.jpg",
+    image: seedImage("p-affogato"),
     description: "Vanilla ice cream drowned in a shot of hot espresso.",
   },
   {
@@ -120,7 +126,7 @@ export const PRODUCT_SEED: ProductSeed[] = [
     name: "Watermelon Smoothie",
     category: "Beverage",
     price: 79,
-    image: "/dishes/watermelon-smoothie.jpg",
+    image: seedImage("p-watermelon-smoothie"),
     description: "Fresh watermelon blended with milk, sugar and ice.",
   },
 ];

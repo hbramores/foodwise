@@ -61,10 +61,14 @@
   backdrop-filter: blur(3px) saturate(1.05);
 }
 
-.app > .side,
-.app > .frame,
-.app > .tabbar,
-.app > .moresheet {
+/* Shell surfaces sit above the wallpaper fade. Only .frame needs its own
+   positioning here — .side and .tabbar are fixed, and forcing `relative`
+   on them would break the pinned sidebar and bottom navigation. */
+.app > .side {
+  z-index: 2;
+}
+
+.app > .frame {
   position: relative;
   z-index: 2;
 }
@@ -131,6 +135,28 @@
 .splash small {
   color: var(--fw-muted);
   font-size: 13px;
+}
+
+/* Grid/flex children default to min-width:auto, which lets a wide child
+   (a pill row, a table, a long name) force the whole column wider than the
+   viewport. Everything that can overflow is allowed to shrink instead. */
+.stack > *,
+.grid2 > *,
+.kpis > *,
+.poslayout > *,
+.fgrid > *,
+.menu-toolbar > *,
+.menu-toolbar__top > *,
+.toolbar > * {
+  min-width: 0;
+}
+
+.toolbar,
+.pillrow,
+.menu-toolbar,
+.menu-toolbar__top,
+.search {
+  min-width: 0;
 }
 
 /* --- Page scaffolding ------------------------------------------------- */
@@ -1601,12 +1627,6 @@
   }
 }
 
-@media (max-width: 420px) {
-  .kpis {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .poscard,
   .fcard2,
@@ -1619,5 +1639,437 @@
   .fcard2:hover,
   .menuitem:hover {
     transform: none;
+  }
+}
+
+
+/* =======================================================================
+   Responsiveness & interaction pass (PRD A1�A7)
+   ======================================================================= */
+
+/* --- A1: consistent interaction feedback ----------------------------- */
+
+.btn,
+.ibtn,
+.chip,
+.filter-pill,
+.seg__btn,
+.paymethod,
+.poscard,
+.fcard2,
+.menuitem,
+.kpi,
+.table__row,
+.tabbar__item,
+.moresheet__item {
+  transition: background-color 0.18s var(--ease, ease), border-color 0.18s var(--ease, ease),
+    color 0.18s var(--ease, ease), box-shadow 0.18s var(--ease, ease), transform 0.18s var(--ease, ease);
+}
+
+/* Clickable surfaces advertise themselves; static cards stay still. */
+.poscard,
+.fcard2,
+.menuitem,
+.table__row {
+  cursor: pointer;
+}
+
+.btn:active,
+.ibtn:active,
+.chip:active,
+.filter-pill:active,
+.seg__btn:active,
+.paymethod:active,
+.menuitem:active,
+.fcard2:active,
+.poscard:active:not(:disabled),
+.table__row:active {
+  transform: translateY(1px);
+}
+
+.table__row:active {
+  background: rgba(47, 101, 41, 0.12);
+}
+
+.app :focus-visible {
+  outline: 2px solid var(--fw-gold, #e6c547);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .kpi:hover {
+    border-color: rgba(230, 197, 71, 0.5);
+    box-shadow: var(--fw-depth), var(--fw-shadow);
+  }
+
+  .card:has(.table__row):hover {
+    border-color: rgba(47, 101, 41, 0.16);
+  }
+}
+
+/* --- A2: sidebar pinned to the viewport ------------------------------ */
+
+@media (min-width: 761px) {
+  .app {
+    display: block;
+  }
+
+  .side {
+    position: fixed;
+    top: 14px;
+    bottom: 14px;
+    left: 14px;
+    width: var(--side-w);
+    height: auto;
+    margin: 0;
+    transform: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+
+  .side::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .side::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+  }
+
+  .frame {
+    margin-left: calc(var(--side-w) + 28px);
+    min-height: 100dvh;
+  }
+
+  .top__menu,
+  .side-scrim {
+    display: none !important;
+  }
+}
+
+/* --- A5: long product names in the cart ------------------------------ */
+
+.cartlines li {
+  align-items: flex-start;
+}
+
+.cartlines__body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.cartlines__body b {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.stepper,
+.cartlines__price {
+  flex: none;
+}
+
+.cartlines__price {
+  white-space: nowrap;
+  padding-top: 2px;
+}
+
+/* --- Food photography presentation ----------------------------------- */
+
+.poscard__media,
+.menuitem__media,
+.fcard2__media,
+.cartlines__media,
+.dpanel__media {
+  aspect-ratio: 4 / 3;
+}
+
+.poscard__media img,
+.menuitem__media img,
+.fcard2__media img,
+.cartlines__media img,
+.dpanel__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.menuitem__media,
+.fcard2__media,
+.cartlines__media {
+  height: auto;
+}
+
+.dpanel__img {
+  max-height: 300px;
+}
+
+/* --- Drawer close control (used by the compact mobile headers) -------- */
+
+.drawer__close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 2;
+}
+
+
+/* =======================================================================
+   Mobile-only refinements (PRD B1�B12). Desktop is untouched.
+   ======================================================================= */
+
+@media (max-width: 760px) {
+  /* B6 � the search field owns a row and the filters scroll inside their own. */
+  .toolbar > .search,
+  .menu-toolbar__top > .search {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .toolbar > .pillrow,
+  .menu-toolbar > .pillrow {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  /* B1 � the tab bar is pinned to the viewport, above the safe area. */
+  .tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    z-index: 45;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .frame {
+    padding-bottom: calc(200px + env(safe-area-inset-bottom));
+  }
+
+  /* B2 � Dashboard KPIs become a 2 � 2 grid. */
+  .kpis--dash {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .kpis--dash .kpi {
+    padding: 12px;
+    border-radius: var(--fw-radius-lg);
+  }
+
+  .kpis--dash .kpi__icon {
+    width: 28px;
+    height: 28px;
+    margin-bottom: 4px;
+    border-radius: 9px;
+  }
+
+  .kpis--dash .kpi__icon .ico {
+    width: 15px;
+    height: 15px;
+  }
+
+  .kpis--dash .kpi__label {
+    font-size: 9.5px;
+    letter-spacing: 0.04em;
+  }
+
+  .kpis--dash .kpi__value {
+    font-size: 21px;
+  }
+
+  /* B10 � Inventory summaries sit in a single compact row. */
+  .kpis--inv {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .kpis--inv .kpi {
+    padding: 9px 8px;
+    border-radius: var(--fw-radius-md);
+    gap: 2px;
+  }
+
+  .kpis--inv .kpi__icon {
+    width: 24px;
+    height: 24px;
+    margin-bottom: 2px;
+    border-radius: 8px;
+  }
+
+  .kpis--inv .kpi__icon .ico {
+    width: 13px;
+    height: 13px;
+  }
+
+  .kpis--inv .kpi__label {
+    font-size: 9px;
+    letter-spacing: 0;
+  }
+
+  .kpis--inv .kpi__value {
+    font-size: 19px;
+  }
+
+  /* B4 � POS intro copy is hidden; operational controls stay. */
+  .head--intro .head__lead {
+    display: none;
+  }
+
+  .head--intro {
+    justify-content: flex-end;
+    align-items: center;
+    margin-bottom: 2px;
+  }
+
+  /* B5 � POS actions collapse to icon-only buttons. */
+  .btn--compact-mobile {
+    min-width: 46px;
+    min-height: 46px;
+    padding: 0;
+    gap: 0;
+  }
+
+  .btn--compact-mobile .btn__label {
+    display: none;
+  }
+
+  /* B7/B8 � preparation and wrap-up panels start at the table. */
+  .drawer--compact-head .dpanel__head {
+    display: none;
+  }
+
+  .drawer--compact-head .dpanel {
+    gap: 12px;
+    padding-top: 4px;
+  }
+
+  .drawer--compact-head .drawer__close {
+    position: static;
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 2px;
+  }
+
+  /* B9 � the forecast explainer is desktop-only. */
+  .banner--hint {
+    display: none;
+  }
+
+  /* B11/B12 � compact tables and lists. */
+  .table th,
+  .table td {
+    padding: 8px 7px;
+    font-size: 12.5px;
+  }
+
+  .table--compact th,
+  .table--compact td {
+    padding: 6px 6px;
+    font-size: 11.5px;
+  }
+
+  .table .col-cat,
+  .table .col-status,
+  .menu-toolbar__top .chip {
+    display: none;
+  }
+
+  .dishcell img {
+    width: 30px;
+    height: 30px;
+  }
+
+  .dishcell b {
+    font-size: 12.5px;
+  }
+
+  .input--num {
+    width: 68px;
+    padding: 6px 8px;
+  }
+
+  .posgrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .poscard {
+    padding: 10px;
+    gap: 5px;
+  }
+
+  .poscard__name {
+    font-size: 13px;
+  }
+
+  .poscard__meta {
+    font-size: 11px;
+  }
+
+  .poscard__avail {
+    font-size: 10.5px;
+    padding: 3px 8px;
+  }
+
+  .menuitem {
+    padding: 9px 10px;
+    gap: 9px;
+  }
+
+  .menuitem__media {
+    width: 44px;
+    height: 44px;
+  }
+
+  .menuitem__body b {
+    font-size: 13px;
+  }
+
+  .menuitem__body small {
+    font-size: 11px;
+  }
+
+  .menuitem__price {
+    font-size: 12.5px;
+  }
+
+  .menuitem__chev {
+    width: 16px;
+    height: 16px;
+  }
+
+  .badge,
+  .status {
+    font-size: 10px;
+  }
+
+  .head__title {
+    font-size: 20px;
+  }
+}
+
+@media (max-width: 400px) {
+  .kpis--dash .kpi__value {
+    font-size: 18px;
+  }
+
+  .kpis--inv .kpi__value {
+    font-size: 16px;
+  }
+
+  .kpis--inv .kpi__label {
+    font-size: 8px;
+  }
+
+  .posgrid {
+    gap: 8px;
   }
 }

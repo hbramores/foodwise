@@ -136,7 +136,7 @@ export function Inventory() {
         </div>
       </header>
 
-      <section className="kpis" aria-label="Inventory summary">
+      <section className="kpis kpis--inv" aria-label="Inventory summary">
         <article className="kpi kpi--green">
           <span className="kpi__icon"><Boxes className="ico" /></span>
           <span className="kpi__label">Total Ingredients</span>
@@ -188,9 +188,9 @@ export function Inventory() {
               <thead>
                 <tr>
                   <th scope="col">Ingredient</th>
-                  <th scope="col">Category</th>
+                  <th scope="col" className="col-cat">Category</th>
                   <th scope="col">Available</th>
-                  <th scope="col">Status</th>
+                  <th scope="col" className="col-status">Status</th>
                   <th scope="col">Actions</th>
                 </tr>
               </thead>
@@ -213,14 +213,14 @@ export function Inventory() {
                       }}
                     >
                       <th scope="row">{ingredient.name}</th>
-                      <td>{ingredient.category}</td>
+                      <td className="col-cat">{ingredient.category}</td>
                       <td>
                         <b className={`stockqty stockqty--${level}`}>
                           {level !== "normal" ? <TriangleAlert className="ico" /> : null}
                           {qtyLabel(ingredient.stock)} {ingredient.unit}
                         </b>
                       </td>
-                      <td>
+                      <td className="col-status">
                         {level === "out" ? (
                           <StatusPill tone="danger">Out of stock</StatusPill>
                         ) : level === "low" ? (

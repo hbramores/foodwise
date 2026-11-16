@@ -4,6 +4,7 @@ import { Badge, Button, Card, EmptyState, Segmented } from "../components/ui";
 import { DetailPanel, DetailRows, DetailSection } from "../components/DetailPanel";
 import { useStore } from "../data/store";
 import { FORECAST_WINDOW, type MenuProduct } from "../types";
+import { productImage, productInitial } from "../lib/images";
 import {
   availableServings,
   forecastFor,
@@ -55,7 +56,7 @@ export function Forecasting() {
         </div>
       </header>
 
-      <div className="banner banner--info">
+      <div className="banner banner--info banner--hint">
         <Info className="ico" />
         <div>
           <b>How the number is calculated</b>
@@ -77,7 +78,7 @@ export function Forecasting() {
             return (
               <button key={product.id} type="button" className="fcard2" onClick={() => setSelected(product)}>
                 <span className="fcard2__media">
-                  {product.image ? <img src={product.image} alt="" loading="lazy" /> : null}
+                  {productImage(product) ? <img src={productImage(product) as string} alt={product.name} loading="lazy" /> : <span className="menuitem__ph">{productInitial(product.name)}</span>}
                 </span>
                 <span className="fcard2__info">
                   <b>{product.name}</b>
@@ -132,7 +133,7 @@ export function Forecasting() {
 
       <Card title="Preparation comparison" icon={<ChefHat className="ico" />} sub="Recommended against what is already available today">
         <div className="tablewrap">
-          <table className="table">
+          <table className="table table--compact">
             <thead>
               <tr>
                 <th scope="col">Dish</th>
@@ -175,7 +176,7 @@ function ForecastDetails({ product, onClose }: { product: MenuProduct | null; on
       eyebrow="Forecast"
       title={product?.name ?? ""}
       subtitle={product ? `${product.category} · ${peso(product.price)}` : ""}
-      media={product?.image ? <img className="dpanel__img" src={product.image} alt="" /> : null}
+      media={product && productImage(product) ? <img className="dpanel__img" src={productImage(product) as string} alt={product.name} /> : null}
       footer={
         <div className="dpanel__actions">
           <Button variant="ghost" onClick={onClose}>Close</Button>

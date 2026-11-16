@@ -2,6 +2,7 @@ import { buildSeedData } from "../src/lib/seed";
 import {
   checkout,
   closeOperatingDay,
+  prepareMany,
   prepareServings,
   setRecipe,
   setTransactionStatus,
@@ -93,8 +94,8 @@ check(availableServings(data, chicken.id) === 50, "Availability increases by exa
 const afterPrep = data.ingredients.find((i) => i.id === chickenIngredient.id) as { stock: number };
 check(Math.abs(stockBefore - afterPrep.stock - 10) < 0.0001, "Chicken pieces deduct 10 kg (200 g × 50)");
 check(
-  data.movements.filter((m) => m.ref === (prep.ok ? prep.batch.id : "")).length === 8,
-  "One inventory movement per recipe line (8 lines)"
+  data.movements.filter((m) => m.ref === (prep.ok ? prep.batch.groupId : "")).length === 8,
+  "One inventory movement per ingredient (8 recipe lines)"
 );
 check(
   data.batches.filter((b) => b.productId === chicken.id && b.date === today).length === 1,
@@ -154,21 +155,25 @@ const closedDay = data.closings[0];
 check(closedDay.lines.every((l) => reconciliationGap(l) === 0), "Seeded closed days are fully reconciled");
 check(wasteSummary(data, periodRange("month", today)).discarded === 10, "Waste summary reads the closing records (10 seeded)");
 
-const badLines: ClosingLineItem[] = [
-  { productId: chicken.id, opening: 0, prepared: 50, sold: 3, remaining: 47, discarded: 0, carriedOver: 0, other: 0 },
+// Wrap Up (A7): the disposition is calculated, and any carry-over/other values
+// supplied by a caller are ignored rather than trusted.
+const wrapInput: ClosingLineItem[] = [
+  { productId: chicken.id, opening: 0, prepared: 50, sold: 1, remaining: 49, discarded: 0, carriedOver: 9, other: 5 },
 ];
-check(!closeOperatingDay(data, today, badLines).ok, "Closing is blocked until every serving is reconciled");
-
-const goodLines: ClosingLineItem[] = [
-  { productId: chicken.id, opening: 0, prepared: 50, sold: 3, remaining: 47, discarded: 2, carriedOver: 45, other: 0 },
-];
-const closed = closeOperatingDay(data, today, goodLines);
-check(closed.ok, "A reconciled day closes successfully");
+const closed = closeOperatingDay(data, today, wrapInput);
+check(closed.ok, "Wrap Up always closes with the calculated disposition");
 if (closed.ok) data = closed.data;
+const stored = data.closings.find((c) => c.date === today)?.lines[0];
+check(stored?.discarded === 49, "Discarded = Prepared − Sold (49)");
+check(stored?.carriedOver === 0 && stored?.other === 0, "Carry-over and other dispositions are removed");
 check(data.days.find((d) => d.date === today)?.status === "closed", "The operating day is marked closed");
-check(availableServings(data, chicken.id) === 47, "Discarding removes 2 servings and carry-over keeps 45");
-check(wasteSummary(data, periodRange("today", today)).discarded === 2, "Today's closing feeds the waste summary");
-check(data.closings.some((c) => c.date === today), "A closing record is stored for today");
+check(availableServings(data, chicken.id) === 0, "Wrap Up clears the day's remaining availability");
+check(wasteSummary(data, periodRange("today", today)).discarded === 49, "Wrap Up feeds the waste summary");
+check(data.closings.filter((c) => c.date === today).length === 1, "No duplicate closing record for the same day");
+check(
+  data.transactions.length === seed.transactions.length + 2,
+  "Historical transactions are preserved by Wrap Up"
+);
 
 /* ------------------------------------------------------- menu & inventory */
 
@@ -217,6 +222,54 @@ if (overPrepared.ok) {
     "Every ledger still ends at its current stock after an override"
   );
 }
+
+/* ------------------------- A3/A4: multi-dish batch preparation + forecast */
+
+let bulk: AppData = buildSeedData();
+const fc = bulk.products.find((p) => p.name === "Fried Chicken") as { id: string };
+const cal = bulk.products.find((p) => p.name === "Calamares") as { id: string };
+const aff = bulk.products.find((p) => p.name === "Affogato") as { id: string };
+const baseline = new Map(bulk.products.map((p) => [p.id, forecastFor(bulk, p.id).recommended]));
+
+const many = prepareMany(bulk, [
+  { productId: fc.id, servings: 40 },
+  { productId: cal.id, servings: 15 },
+  { productId: aff.id, servings: 0 },
+]);
+check(many.ok, "Several dishes prepare in a single confirmation");
+if (many.ok) bulk = many.data;
+check(many.ok && many.batches.length === 2, "Zero or blank quantities create no preparation entry");
+check(
+  availableServings(bulk, fc.id) === 40 && availableServings(bulk, cal.id) === 15,
+  "Availability rises for every dish in the batch"
+);
+const groupMoves = many.ok ? bulk.movements.filter((m) => m.ref === many.groupId) : [];
+const calIngredients = new Set(
+  bulk.recipes.filter((r) => r.productId === cal.id).map((r) => r.ingredientId)
+);
+check(
+  many.ok && groupMoves.length > 0 && groupMoves.every((m) => m.ref === many.groupId),
+  "Every movement belongs to the one batch group"
+);
+check(
+  groupMoves.filter((m) => calIngredients.has(m.ingredientId)).length === calIngredients.size,
+  "Each ingredient is deducted exactly once per batch"
+);
+check(
+  bulk.products.every((p) => forecastFor(bulk, p.id).recommended === baseline.get(p.id)),
+  "Preparation never changes forecast recommendations"
+);
+check(
+  bulk.products.every((p) => !forecastFor(bulk, p.id).dates.includes(today)),
+  "An open day with no sales never enters the forecast window"
+);
+
+const overridden = prepareMany(bulk, [{ productId: fc.id, servings: 5000 }], true);
+check(overridden.ok, "An explicit override still confirms the batch");
+check(
+  overridden.ok && overridden.data.ingredients.every((i) => i.stock >= 0),
+  "A batch never writes a negative stock"
+);
 
 const levels = stockState(restocked);
 check(levels.out.length + levels.low.length + levels.normal.length === 29, "Stock status partitions every ingredient");

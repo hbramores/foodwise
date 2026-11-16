@@ -133,18 +133,23 @@ export interface Forecast {
 
 /**
  * PRD §5.2 — the rolling window over the latest valid recorded operating
- * dates. A date counts when the dish was prepared or sold that day; missing
- * days are skipped rather than treated as zero.
+ * dates.
+ *
+ * A date counts when the dish had a completed sale, or when the operating day
+ * was wrapped up (an explicit zero-sales day may count). Preparation is
+ * deliberately excluded: typing or confirming prepared quantities must never
+ * move the recommendation (PRD A4).
  */
 export function forecastFor(data: AppData, productId: string): Forecast {
+  const closedDates = new Set(data.days.filter((d) => d.status === "closed").map((d) => d.date));
+  const soldDates = new Set<string>();
+  for (const txn of data.transactions) {
+    if (txn.status !== "completed") continue;
+    if (txn.items.some((line) => line.productId === productId)) soldDates.add(txn.date);
+  }
+
   const candidateDates = [...new Set(data.days.map((d) => d.date))].sort();
-  const recorded = candidateDates.filter((date) => {
-    const wasPrepared = data.batches.some((b) => b.productId === productId && b.date === date);
-    const wasSold = data.transactions.some(
-      (t) => t.status === "completed" && t.date === date && t.items.some((l) => l.productId === productId)
-    );
-    return wasPrepared || wasSold;
-  });
+  const recorded = candidateDates.filter((date) => soldDates.has(date) || closedDates.has(date));
 
   const dates = recorded.slice(-FORECAST_WINDOW);
   const values = dates.map((date) => soldQtyOn(data, productId, date));
@@ -347,28 +352,30 @@ export interface ClosingDraftLine extends ClosingLineItem {
   category: MenuProduct["category"];
 }
 
-/** Live reconciliation rows for the day being closed. */
+/**
+ * Live Wrap Up rows. Discarded is calculated, never typed:
+ * Discarded = Prepared − Sold (PRD A7).
+ */
 export function closingDraft(data: AppData, date: string): ClosingDraftLine[] {
   return data.products
     .filter((p) => p.status === "active")
     .map((product) => {
-      const opening = openingFor(data, product.id, date);
       const prepared = data.batches
         .filter((b) => b.productId === product.id && b.date === date)
         .reduce((sum, b) => sum + b.servings, 0);
       const sold = soldQtyOn(data, product.id, date);
-      const alreadyClosed = closingFor(data, date)?.lines.find((l) => l.productId === product.id);
+      const discarded = Math.max(0, prepared - sold);
       return {
         productId: product.id,
         name: product.name,
         category: product.category,
-        opening,
+        opening: 0,
         prepared,
         sold,
-        remaining: Math.max(0, opening + prepared - sold - (alreadyClosed?.discarded ?? 0)),
-        discarded: alreadyClosed?.discarded ?? 0,
-        carriedOver: alreadyClosed?.carriedOver ?? 0,
-        other: alreadyClosed?.other ?? 0,
+        remaining: discarded,
+        discarded,
+        carriedOver: 0,
+        other: 0,
       };
     });
 }

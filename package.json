@@ -9,7 +9,7 @@
     "build": "node node_modules/typescript/bin/tsc -b && node node_modules/vite/bin/vite.js build",
     "preview": "vite preview",
     "typecheck": "node node_modules/typescript/bin/tsc -b --noEmit",
-    "verify": "esbuild scripts/verify.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/foodwise-verify.mjs --log-level=error && node node_modules/.cache/foodwise-verify.mjs"
+    "verify": "esbuild scripts/verify.ts --bundle --platform=node --format=esm --loader:.webp=dataurl --loader:.png=dataurl --loader:.jpg=dataurl --outfile=node_modules/.cache/foodwise-verify.mjs --log-level=error && node node_modules/.cache/foodwise-verify.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.114.3",

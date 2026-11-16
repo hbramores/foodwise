@@ -16,17 +16,9 @@ import { useStore } from "../data/store";
 import { useToast } from "../data/toast";
 import { MENU_CATEGORIES, UNITS, type MenuCategory, type MenuProduct, type Unit } from "../types";
 import { forecastFor } from "../lib/calc";
+import { IMAGE_LIBRARY, productImage, productInitial } from "../lib/images";
 import { num, parseNumberInput, peso } from "../lib/format";
 import { qtyLabel } from "../lib/units";
-
-const IMAGE_CHOICES = [
-  { label: "Calamares", value: "/dishes/calamares.jpg" },
-  { label: "Fried Chicken", value: "/dishes/fried-chicken.jpg" },
-  { label: "Creamy Mushroom Soup", value: "/dishes/mushroom-soup.jpg" },
-  { label: "German Potato Salad", value: "/dishes/potato-salad.jpg" },
-  { label: "Affogato", value: "/dishes/affogato.jpg" },
-  { label: "Watermelon Smoothie", value: "/dishes/watermelon-smoothie.jpg" },
-];
 
 interface RecipeDraft {
   key: string;
@@ -46,7 +38,7 @@ interface ProductDraft {
 }
 
 function blankDraft(): ProductDraft {
-  return { id: "", name: "", category: "Main Course", price: "0", image: null, description: "", recipe: [] };
+  return { id: "", name: "", category: "Main Course", price: "0", image: IMAGE_LIBRARY[1].value, description: "", recipe: [] };
 }
 
 export function MenuRecipes() {
@@ -79,7 +71,7 @@ export function MenuRecipes() {
       name: product.name,
       category: product.category,
       price: String(product.price),
-      image: product.image,
+      image: productImage(product),
       description: product.description,
       recipe: data.recipes
         .filter((r) => r.productId === product.id)
@@ -187,7 +179,7 @@ export function MenuRecipes() {
               return (
                 <button key={product.id} type="button" className="menuitem" onClick={() => openProduct(product)}>
                   <span className="menuitem__media">
-                    {product.image ? <img src={product.image} alt="" loading="lazy" /> : <span className="menuitem__ph">{product.name.slice(0, 1)}</span>}
+                    {productImage(product) ? <img src={productImage(product) as string} alt={product.name} loading="lazy" /> : <span className="menuitem__ph">{productInitial(product.name)}</span>}
                   </span>
                   <span className="menuitem__body">
                     <b>{product.name}</b>
@@ -218,7 +210,7 @@ export function MenuRecipes() {
         eyebrow="Product"
         title={current?.name ?? ""}
         subtitle={current ? `${current.category} · ${peso(current.price)}` : ""}
-        media={current?.image ? <img className="dpanel__img" src={current.image} alt="" /> : null}
+        media={current && productImage(current) ? <img className="dpanel__img" src={productImage(current) as string} alt={current.name} /> : null}
         footer={
           <div className="dpanel__actions">
             <Button
@@ -306,7 +298,7 @@ export function MenuRecipes() {
             </Field>
             <Field label="Image" hint="Choose a bundled photo or upload your own.">
               <div className="imgpicker">
-                {IMAGE_CHOICES.map((choice) => (
+                {IMAGE_LIBRARY.map((choice) => (
                   <button
                     key={choice.value}
                     type="button"

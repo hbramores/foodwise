@@ -66,7 +66,7 @@ export function Dashboard({ navigate }: { navigate: (r: RouteKey) => void }) {
         </div>
       </header>
 
-      <section className="kpis" aria-label="Key figures">
+      <section className="kpis kpis--dash" aria-label="Key figures">
         <Kpi icon={<Wallet className="ico" />} tone="green" label="Total Sales" value={peso(summary.sales)} />
         <Kpi icon={<ShoppingCart className="ico" />} tone="gold" label="Orders" value={num(summary.orders)} />
         <Kpi icon={<ChefHat className="ico" />} tone="gold" label="Servings Prepared" value={num(summary.prepared)} />

@@ -85,6 +85,11 @@ export interface PreparationBatch {
   servings: number;
   /** true when confirmed despite insufficient stock */
   override: boolean;
+  /**
+   * Batches confirmed in the same preparation session share a group id, so one
+   * "Add Prepared Food" submission is stored and reported as a single batch.
+   */
+  groupId?: string;
   createdAt: string;
 }
 

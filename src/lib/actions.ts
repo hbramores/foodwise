@@ -39,6 +39,11 @@ export function reopenOperatingDay(data: AppData, date: string): AppData {
 
 /* ------------------------------------------------------------ preparation */
 
+export interface PreparationEntry {
+  productId: string;
+  servings: number;
+}
+
 export interface PreparationInput {
   productId: string;
   servings: number;
@@ -50,45 +55,78 @@ export type PreparationResult =
   | { ok: true; data: AppData; batch: PreparationBatch }
   | { ok: false; error: string; blockers: RequirementLine[] };
 
+export type PrepareManyResult =
+  | { ok: true; data: AppData; groupId: string; batches: PreparationBatch[]; servings: number }
+  | { ok: false; error: string; blockers: RequirementLine[] };
+
 /**
- * Confirms a preparation batch: creates the batch, deducts every recipe
- * ingredient exactly once, and records an inventory movement per ingredient.
- * Nothing is written when validation fails, so a batch can never be partial.
+ * Confirms one preparation session covering several products at once
+ * (PRD A3). The whole session is written in a single state update, so it is
+ * atomic: either every entered quantity is saved or nothing is.
+ *
+ * Ingredient usage is aggregated per ingredient across the session and
+ * deducted exactly once, with one movement per ingredient for the batch.
  */
-export function prepareServings(data: AppData, input: PreparationInput): PreparationResult {
-  const date = input.date ?? manilaToday();
-  const servings = Math.floor(input.servings);
-  const product = data.products.find((p) => p.id === input.productId);
+export function prepareMany(
+  data: AppData,
+  entries: PreparationEntry[],
+  override = false,
+  date = manilaToday()
+): PrepareManyResult {
+  const clean = entries
+    .map((entry) => ({ productId: entry.productId, servings: Math.floor(entry.servings) }))
+    .filter((entry) => Number.isFinite(entry.servings) && entry.servings > 0);
 
-  if (!product) return { ok: false, error: "Unknown product.", blockers: [] };
-  if (product.status !== "active") return { ok: false, error: `${product.name} is archived.`, blockers: [] };
-  if (!Number.isFinite(servings) || servings <= 0) {
-    return { ok: false, error: "Enter a whole number of servings above zero.", blockers: [] };
-  }
-  const recipe = data.recipes.filter((r) => r.productId === product.id);
-  if (!recipe.length) {
-    return { ok: false, error: `${product.name} has no recipe yet. Add recipe ingredients first.`, blockers: [] };
+  // Blank or zero rows never create a preparation entry.
+  if (!clean.length) {
+    return { ok: false, error: "Enter a prepared quantity for at least one dish.", blockers: [] };
   }
 
-  const requirement = requirementFor(data, product.id, servings);
+  const products = new Map<string, MenuProduct>();
+  for (const entry of clean) {
+    const product = data.products.find((p) => p.id === entry.productId);
+    if (!product) return { ok: false, error: "A selected dish no longer exists.", blockers: [] };
+    if (product.status !== "active") {
+      return { ok: false, error: `${product.name} is archived.`, blockers: [] };
+    }
+    if (!data.recipes.some((r) => r.productId === product.id)) {
+      return { ok: false, error: `${product.name} has no recipe yet.`, blockers: [] };
+    }
+    products.set(product.id, product);
+  }
+
+  const groupId = uid("batch");
+  const now = new Date().toISOString();
+
+  // Aggregate the whole session's ingredient usage before touching stock.
+  const usage = new Map<string, number>();
+  for (const entry of clean) {
+    for (const line of requirementFor(data, entry.productId, entry.servings)) {
+      usage.set(line.ingredient.id, round3((usage.get(line.ingredient.id) ?? 0) + line.qty));
+    }
+  }
+
+  const requirement: RequirementLine[] = [...usage.entries()].map(([ingredientId, qty]) => {
+    const ingredient = data.ingredients.find((i) => i.id === ingredientId) as Ingredient;
+    return { ingredient, qty, available: ingredient.stock, ok: ingredient.stock >= qty };
+  });
   const blockers = requirement.filter((line) => !line.ok);
-  if (blockers.length && !input.override) {
+  if (blockers.length && !override) {
     return { ok: false, error: "Not enough ingredients for this batch.", blockers };
   }
 
-  const now = new Date().toISOString();
-  const batch: PreparationBatch = {
+  const batches: PreparationBatch[] = clean.map((entry) => ({
     id: uid("batch"),
-    productId: product.id,
+    productId: entry.productId,
     date,
-    servings,
-    override: Boolean(input.override && blockers.length),
+    servings: entry.servings,
+    override: Boolean(override && blockers.length),
+    groupId,
     createdAt: now,
-  };
+  }));
 
   const ingredientPatches = new Map<string, number>();
   const movements: InventoryMovement[] = [];
-
   for (const line of requirement) {
     // Stock floors at zero so an explicit override can never write a negative
     // balance; the movement records what was actually consumed.
@@ -101,22 +139,35 @@ export function prepareServings(data: AppData, input: PreparationInput): Prepara
       kind: "prep" as MovementKind,
       qty: round3(next - line.ingredient.stock),
       balanceAfter: next,
-      ref: batch.id,
-      note: `Prepared ${servings} × ${product.name}`,
+      ref: groupId,
+      note: `Prepared ${clean.length === 1 ? `${clean[0].servings} × ${products.get(clean[0].productId)?.name}` : `${clean.length} dishes in one batch`}`,
       createdAt: now,
     });
   }
 
   const next: AppData = {
     ...data,
-    batches: [...data.batches, batch],
+    batches: [...data.batches, ...batches],
     movements: [...data.movements, ...movements],
     ingredients: data.ingredients.map((i) =>
       ingredientPatches.has(i.id) ? { ...i, stock: ingredientPatches.get(i.id) as number, updatedAt: now } : i
     ),
   };
 
-  return { ok: true, data: ensureOpenDay(next, date), batch };
+  return {
+    ok: true,
+    data: ensureOpenDay(next, date),
+    groupId,
+    batches,
+    servings: clean.reduce((sum, entry) => sum + entry.servings, 0),
+  };
+}
+
+/** Single-dish convenience wrapper used by tests and quick actions. */
+export function prepareServings(data: AppData, input: PreparationInput): PreparationResult {
+  const result = prepareMany(data, [{ productId: input.productId, servings: input.servings }], input.override, input.date);
+  if (!result.ok) return result;
+  return { ok: true, data: result.data, batch: result.batches[0] };
 }
 
 /* ------------------------------------------------------------------ POS */
@@ -215,17 +266,34 @@ export interface CloseResult {
   data: AppData;
 }
 
+/**
+ * Wrap Up (PRD A7). Every unsold serving is discarded, so the disposition is
+ * calculated rather than entered: Discarded = Prepared − Sold. Carry-over is
+ * intentionally removed from the prototype, which also clears the day's
+ * remaining prepared-serving availability.
+ */
 export function closeOperatingDay(
   data: AppData,
   date: string,
   lines: ClosingLineItem[]
 ): CloseResult {
-  const gap = lines.reduce((sum, line) => sum + Math.abs(reconciliationGap(line)), 0);
+  const normalised: ClosingLineItem[] = lines.map((line) => ({
+    productId: line.productId,
+    opening: line.opening,
+    prepared: line.prepared,
+    sold: line.sold,
+    remaining: Math.max(0, line.prepared - line.sold),
+    discarded: Math.max(0, line.prepared - line.sold),
+    carriedOver: 0,
+    other: 0,
+  }));
+
+  const gap = normalised.reduce((sum, line) => sum + Math.abs(reconciliationGap(line)), 0);
   if (gap > 0.0001) {
-    return { ok: false, error: "Every remaining serving must be reconciled before closing.", data };
+    return { ok: false, error: "Discarded servings must equal prepared minus sold.", data };
   }
 
-  const record = { id: uid("close"), date, lines, closedAt: new Date().toISOString() };
+  const record = { id: uid("close"), date, lines: normalised, closedAt: new Date().toISOString() };
   const next: AppData = {
     ...data,
     closings: [...data.closings.filter((c) => c.date !== date), record],

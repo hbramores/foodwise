@@ -16,6 +16,7 @@ export function DetailPanel({
   media,
   footer,
   size = "md",
+  compactHeader = false,
   children,
 }: {
   open: boolean;
@@ -26,6 +27,8 @@ export function DetailPanel({
   media?: ReactNode;
   footer?: ReactNode;
   size?: "md" | "wide";
+  /** Hide the descriptive heading on mobile so the content starts immediately. */
+  compactHeader?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -33,7 +36,7 @@ export function DetailPanel({
       open={open}
       onClose={onClose}
       label={title}
-      className={size === "wide" ? "drawer--wide" : undefined}
+      className={`${size === "wide" ? "drawer--wide" : ""}${compactHeader ? " drawer--compact-head" : ""}`.trim() || undefined}
     >
       <article className="dpanel">
         <header className="dpanel__head">

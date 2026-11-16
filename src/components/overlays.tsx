@@ -159,7 +159,7 @@ export function Drawer({
         tabIndex={-1}
       >
         <div className="drawer__inner">
-          <div style={{ position: "absolute", top: 18, right: 18, zIndex: 2 }}>
+          <div className="drawer__close">
             <IconButton label="Close" ghost size="sm" onClick={onClose}>
               <X className="ico" />
             </IconButton>

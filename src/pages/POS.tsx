@@ -1,14 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Ban,
   ChefHat,
   Minus,
+  PackageCheck,
   Plus,
   Receipt,
   RotateCcw,
   Search,
   ShoppingCart,
-  SunMedium,
   Trash2,
   TriangleAlert,
   Undo2,
@@ -23,21 +23,16 @@ import { useMediaQuery } from "../hooks";
 import {
   MENU_CATEGORIES,
   PAYMENT_METHODS,
-  type ClosingLineItem,
+  type Ingredient,
   type MenuCategory,
   type PaymentMethod,
   type POSTransaction,
 } from "../types";
-import {
-  availableServings,
-  closingDraft,
-  forecastFor,
-  reconciliationGap,
-  requirementFor,
-} from "../lib/calc";
+import { availableServings, closingDraft, forecastFor, requirementFor } from "../lib/calc";
+import { productImage, productInitial } from "../lib/images";
 import { formatLong, manilaStamp, manilaToday } from "../lib/date";
-import { num, peso, parseNumberInput } from "../lib/format";
-import { qtyLabel } from "../lib/units";
+import { num, parseNumberInput, peso } from "../lib/format";
+import { round3, qtyLabel } from "../lib/units";
 
 interface CartLine {
   productId: string;
@@ -47,7 +42,7 @@ interface CartLine {
 type View = "sell" | "history";
 
 export function POS() {
-  const { data, prepare, checkout, closeDay, reopenDay, setTxnStatus } = useStore();
+  const { data, prepareMany, checkout, closeDay, reopenDay, setTxnStatus } = useStore();
   const { push } = useToast();
   const today = manilaToday();
   const isNarrow = useMediaQuery("(max-width: 900px)");
@@ -65,9 +60,9 @@ export function POS() {
   const [prepOpen, setPrepOpen] = useState(false);
   const [prepQty, setPrepQty] = useState<Record<string, string>>({});
   const [prepOverride, setPrepOverride] = useState(false);
+  const [prepSuggested, setPrepSuggested] = useState<Record<string, number | null>>({});
 
-  const [closeOpen, setCloseOpen] = useState(false);
-  const [closing, setClosing] = useState<Record<string, { discarded: string; carriedOver: string; other: string }>>({});
+  const [wrapOpen, setWrapOpen] = useState(false);
 
   const [selected, setSelected] = useState<POSTransaction | null>(null);
   const [voidTarget, setVoidTarget] = useState<POSTransaction | null>(null);
@@ -75,12 +70,15 @@ export function POS() {
   const day = data.days.find((d) => d.date === today);
   const dayClosed = day?.status === "closed";
 
-  const products = useMemo(() => {
-    return data.products
-      .filter((p) => p.status === "active")
-      .filter((p) => category === "all" || p.category === category)
-      .filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase()));
-  }, [data.products, category, query]);
+  const activeProducts = useMemo(() => data.products.filter((p) => p.status === "active"), [data.products]);
+
+  const products = useMemo(
+    () =>
+      activeProducts
+        .filter((p) => category === "all" || p.category === category)
+        .filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase())),
+    [activeProducts, category, query]
+  );
 
   const cartLines = cart.map((line) => {
     const product = data.products.find((p) => p.id === line.productId);
@@ -92,7 +90,7 @@ export function POS() {
   const transactions = useMemo(
     () =>
       [...data.transactions]
-        .filter((t) => t.code.toLowerCase().includes(query.trim().toLowerCase()) || query.trim() === "")
+        .filter((t) => query.trim() === "" || t.code.toLowerCase().includes(query.trim().toLowerCase()))
         .sort((a, b) => (a.at < b.at ? 1 : -1)),
     [data.transactions, query]
   );
@@ -146,80 +144,91 @@ export function POS() {
 
   /* ----------------------------------------------------- preparation ops */
 
-  const prepRows = data.products
-    .filter((p) => p.status === "active")
-    .map((product) => ({
-      product,
-      suggested: forecastFor(data, product.id).recommended,
-      value: prepQty[product.id] ?? "",
-    }));
-  const prepTotal = prepRows.reduce((sum, row) => sum + (parseNumberInput(row.value) ?? 0), 0);
-  const prepBlockers = prepRows.flatMap((row) => {
-    const qty = parseNumberInput(row.value) ?? 0;
-    if (qty <= 0) return [];
-    return requirementFor(data, row.product.id, qty).filter((line) => !line.ok);
-  });
+  /**
+   * The recommendation is snapshotted when the panel opens so it stays stable
+   * while quantities are typed, and preparation never feeds the forecast.
+   */
+  useEffect(() => {
+    if (!prepOpen) return;
+    const snapshot: Record<string, number | null> = {};
+    for (const product of data.products.filter((p) => p.status === "active")) {
+      snapshot[product.id] = forecastFor(data, product.id).recommended;
+    }
+    setPrepSuggested(snapshot);
+    // Intentionally only on open: the session keeps its own stable values.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prepOpen]);
+
+  const prepRows = activeProducts.map((product) => ({
+    product,
+    suggested: prepSuggested[product.id] ?? null,
+    value: prepQty[product.id] ?? "",
+  }));
+
+  const prepEntries = prepRows
+    .map((row) => ({ productId: row.product.id, servings: parseNumberInput(row.value) ?? 0 }))
+    .filter((entry) => Number.isFinite(entry.servings) && entry.servings > 0);
+  const prepTotal = prepEntries.reduce((sum, entry) => sum + Math.floor(entry.servings), 0);
+  const prepBatchCount = prepEntries.length;
+
+  const prepBlockers = useMemo(() => {
+    const usage = new Map<string, { ingredient: Ingredient; qty: number }>();
+    for (const entry of prepEntries) {
+      for (const line of requirementFor(data, entry.productId, entry.servings)) {
+        const previous = usage.get(line.ingredient.id);
+        usage.set(line.ingredient.id, {
+          ingredient: line.ingredient,
+          qty: round3((previous?.qty ?? 0) + line.qty),
+        });
+      }
+    }
+    return [...usage.values()].filter((line) => line.ingredient.stock < line.qty);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prepQty, data]);
 
   function confirmPreparation() {
-    const rows = prepRows.filter((row) => (parseNumberInput(row.value) ?? 0) > 0);
-    if (!rows.length) {
-      push("Enter at least one prepared quantity.", "danger");
+    if (!prepEntries.length) {
+      push("Enter a prepared quantity for at least one dish.", "danger");
       return;
     }
-    let applied = 0;
-    for (const row of rows) {
-      const qty = parseNumberInput(row.value) ?? 0;
-      const result = prepare(row.product.id, qty, prepOverride);
-      if (!result.ok) {
-        push(`${row.product.name}: ${result.error}`, "danger");
-        return;
-      }
-      applied += 1;
+    const result = prepareMany(prepEntries, prepOverride);
+    if (!result.ok) {
+      push(result.error, "danger");
+      return;
     }
-    push(`Prepared ${num(prepTotal)} servings across ${applied} dish(es). Availability and inventory updated.`, "good");
+    push(
+      `Prepared ${num(result.servings)} servings across ${result.batches.length} dish(es) in one batch. Availability and inventory updated.`,
+      "good"
+    );
     setPrepQty({});
     setPrepOverride(false);
     setPrepOpen(false);
   }
 
-  /* --------------------------------------------------------- closing ops */
+  /* --------------------------------------------------------- wrap up ops */
 
-  const draft = closingDraft(data, today);
-  const closeRows: ClosingLineItem[] = draft.map((line) => {
-    const entry = closing[line.productId];
-    return {
-      productId: line.productId,
-      opening: line.opening,
-      prepared: line.prepared,
-      sold: line.sold,
-      remaining: line.remaining,
-      discarded: entry ? Math.max(0, Math.floor(parseNumberInput(entry.discarded) ?? 0)) : line.discarded,
-      carriedOver: entry ? Math.max(0, Math.floor(parseNumberInput(entry.carriedOver) ?? 0)) : line.carriedOver,
-      other: entry ? Math.max(0, Math.floor(parseNumberInput(entry.other) ?? 0)) : line.other,
-    };
-  });
-  const closeGaps = closeRows.filter((line) => Math.abs(reconciliationGap(line)) > 0.0001);
+  const wrapRows = closingDraft(data, today);
+  const wrapDiscarded = wrapRows.reduce((sum, row) => sum + row.discarded, 0);
 
-  function confirmClosing() {
-    const result = closeDay(today, closeRows);
+  function confirmWrapUp() {
+    const result = closeDay(today, wrapRows);
     if (!result.ok) {
-      push(result.error ?? "Could not close the day.", "danger");
+      push(result.error ?? "Could not wrap up the day.", "danger");
       return;
     }
-    push(`Operating day closed. ${num(closeRows.reduce((s, l) => s + l.discarded, 0))} serving(s) recorded as discarded.`, "good");
-    setCloseOpen(false);
-    setClosing({});
+    push(`Day wrapped up. ${num(wrapDiscarded)} unsold serving(s) recorded as discarded.`, "good");
+    setWrapOpen(false);
   }
 
   /* ------------------------------------------------------------- render */
 
   return (
     <div className="stack">
-      <header className="head">
+      <header className="head head--intro">
         <div className="head__lead">
           <h1 className="head__title">POS Selling</h1>
           <p className="head__sub">
-            {formatLong(today)} · prepare food, sell servings and close the operating day.
+            {formatLong(today)} · prepare food, sell servings and wrap up the day.
           </p>
         </div>
         <div className="head__actions">
@@ -232,25 +241,35 @@ export function POS() {
             onChange={setView}
             ariaLabel="POS view"
           />
-          <Button variant="accent" icon={<ChefHat className="ico" />} onClick={() => setPrepOpen(true)}>
-            Add Prepared Food
+          <Button
+            variant="accent"
+            className="btn--compact-mobile"
+            icon={<ChefHat className="ico" />}
+            aria-label="Add Prepared Food"
+            title="Add Prepared Food"
+            onClick={() => setPrepOpen(true)}
+          >
+            <span className="btn__label">Add Prepared Food</span>
           </Button>
           <Button
             variant={dayClosed ? "soft" : "ghost"}
-            icon={<SunMedium className="ico" />}
-            onClick={() => (dayClosed ? reopenDay(today) : setCloseOpen(true))}
+            className="btn--compact-mobile"
+            icon={<PackageCheck className="ico" />}
+            aria-label={dayClosed ? "Reopen Day" : "Wrap Up"}
+            title={dayClosed ? "Reopen Day" : "Wrap Up"}
+            onClick={() => (dayClosed ? reopenDay(today) : setWrapOpen(true))}
           >
-            {dayClosed ? "Reopen Day" : "Close Day"}
+            <span className="btn__label">{dayClosed ? "Reopen Day" : "Wrap Up"}</span>
           </Button>
         </div>
       </header>
 
       {dayClosed ? (
         <div className="banner banner--info">
-          <SunMedium className="ico" />
+          <PackageCheck className="ico" />
           <div>
-            <b>Today is closed and reconciled.</b>
-            <p>The figures below include the closing record. Reopen the day to keep selling.</p>
+            <b>Today is wrapped up.</b>
+            <p>The figures below include the wrap-up record. Reopen the day to keep selling.</p>
           </div>
         </div>
       ) : null}
@@ -296,16 +315,22 @@ export function POS() {
                 {products.map((product) => {
                   const available = availableServings(data, product.id);
                   const soldOut = available <= 0;
+                  const image = productImage(product);
                   return (
                     <button
                       key={product.id}
                       type="button"
                       className={`poscard${soldOut ? " is-soldout" : ""}`}
                       disabled={soldOut}
+                      aria-label={`Add ${product.name} to the order`}
                       onClick={() => addToCart(product.id)}
                     >
                       <span className="poscard__media">
-                        {product.image ? <img src={product.image} alt="" loading="lazy" /> : <span className="poscard__ph">{product.name.slice(0, 1)}</span>}
+                        {image ? (
+                          <img src={image} alt={product.name} loading="lazy" width={800} height={600} />
+                        ) : (
+                          <span className="poscard__ph">{productInitial(product.name)}</span>
+                        )}
                       </span>
                       <span className="poscard__name">{product.name}</span>
                       <span className="poscard__meta">
@@ -358,7 +383,7 @@ export function POS() {
           </div>
           {transactions.length ? (
             <div className="tablewrap">
-              <table className="table">
+              <table className="table table--compact">
                 <thead>
                   <tr>
                     <th scope="col">Receipt</th>
@@ -500,19 +525,22 @@ export function POS() {
         </DetailSection>
       </DetailPanel>
 
-      {/* Add prepared food */}
+      {/* Add prepared food — one session, many dishes */}
       <DetailPanel
         open={prepOpen}
         onClose={() => setPrepOpen(false)}
         size="wide"
+        compactHeader
         eyebrow="Preparation"
         title="Add Prepared Food"
-        subtitle="Forecast suggestions load automatically. Ingredient stock is deducted when you confirm."
+        subtitle="Enter quantities for one or more dishes, then confirm the batch once."
         footer={
           <div className="dpanel__actions">
-            <span className="dpanel__total">{num(prepTotal)} serving(s) to prepare</span>
+            <span className="dpanel__total">
+              {prepBatchCount ? `${num(prepTotal)} serving(s) · ${prepBatchCount} dish(es)` : "No quantities entered"}
+            </span>
             <Button variant="ghost" onClick={() => setPrepOpen(false)}>Cancel</Button>
-            <Button onClick={confirmPreparation}>Confirm Preparation</Button>
+            <Button onClick={confirmPreparation} disabled={!prepBatchCount}>Confirm Preparation</Button>
           </div>
         }
       >
@@ -520,11 +548,11 @@ export function POS() {
           <div className="banner banner--warn">
             <TriangleAlert className="ico" />
             <div>
-              <b>Not enough ingredients for {prepBlockers.length} item(s)</b>
+              <b>Not enough ingredients for {prepBlockers.length} ingredient(s)</b>
               <p>
                 {prepBlockers
                   .slice(0, 5)
-                  .map((b) => `${b.ingredient.name} needs ${qtyLabel(b.qty)} ${b.ingredient.unit}, ${qtyLabel(b.available)} available`)
+                  .map((b) => `${b.ingredient.name} needs ${qtyLabel(b.qty)} ${b.ingredient.unit}, ${qtyLabel(b.ingredient.stock)} available`)
                   .join(" · ")}
               </p>
               <label className="checkrow">
@@ -536,12 +564,11 @@ export function POS() {
         ) : null}
 
         <div className="tablewrap">
-          <table className="table">
+          <table className="table table--compact">
             <thead>
               <tr>
-                <th scope="col">Food item</th>
-                <th scope="col">Available now</th>
-                <th scope="col">Suggested</th>
+                <th scope="col">Product</th>
+                <th scope="col">Recommended</th>
                 <th scope="col">Prepared</th>
               </tr>
             </thead>
@@ -550,14 +577,13 @@ export function POS() {
                 <tr key={row.product.id}>
                   <td>
                     <span className="dishcell">
-                      {row.product.image ? <img src={row.product.image} alt="" /> : null}
+                      {productImage(row.product) ? <img src={productImage(row.product) as string} alt="" loading="lazy" /> : null}
                       <span>
                         <b>{row.product.name}</b>
-                        <small>{row.product.category}</small>
+                        <small>{num(availableServings(data, row.product.id))} available now</small>
                       </span>
                     </span>
                   </td>
-                  <td>{num(availableServings(data, row.product.id))}</td>
                   <td>
                     {row.suggested === null ? <span className="muted">—</span> : <Badge tone="sage">{num(row.suggested)}</Badge>}
                   </td>
@@ -568,9 +594,7 @@ export function POS() {
                       aria-label={`Prepared servings for ${row.product.name}`}
                       value={row.value}
                       placeholder="0"
-                      onChange={(e) =>
-                        setPrepQty((prev) => ({ ...prev, [row.product.id]: e.target.value }))
-                      }
+                      onChange={(e) => setPrepQty((prev) => ({ ...prev, [row.product.id]: e.target.value }))}
                     />
                   </td>
                 </tr>
@@ -578,98 +602,57 @@ export function POS() {
             </tbody>
           </table>
         </div>
+        <p className="note">
+          One confirmation saves the whole batch, deducts each ingredient once and updates POS availability.
+        </p>
       </DetailPanel>
 
-      {/* Close day */}
+      {/* Wrap up — discarded is calculated */}
       <DetailPanel
-        open={closeOpen}
-        onClose={() => setCloseOpen(false)}
+        open={wrapOpen}
+        onClose={() => setWrapOpen(false)}
         size="wide"
+        compactHeader
         eyebrow="End of day"
-        title="Close Operating Day"
+        title="Wrap Up"
         subtitle={formatLong(today)}
         footer={
           <div className="dpanel__actions">
-            <span className={`dpanel__total${closeGaps.length ? " is-warn" : ""}`}>
-              {closeGaps.length ? `${closeGaps.length} row(s) not reconciled` : "All rows reconciled"}
-            </span>
-            <Button variant="ghost" onClick={() => setCloseOpen(false)}>Cancel</Button>
-            <Button onClick={confirmClosing} disabled={closeGaps.length > 0}>Close Day</Button>
+            <span className="dpanel__total">{num(wrapDiscarded)} serving(s) will be discarded</span>
+            <Button variant="ghost" onClick={() => setWrapOpen(false)}>Cancel</Button>
+            <Button onClick={confirmWrapUp}>Wrap Up</Button>
           </div>
         }
       >
         <p className="note">
-          Remaining = discarded + carried over + other accounted-for. Carried-over servings stay
-          sellable tomorrow; nothing is discarded automatically.
+          Discarded = Prepared − Sold. Every unsold serving is recorded as discarded and the day&apos;s
+          availability is cleared.
         </p>
         <div className="tablewrap">
-          <table className="table">
+          <table className="table table--compact">
             <thead>
               <tr>
-                <th scope="col">Dish</th>
-                <th scope="col">Opening</th>
+                <th scope="col">Product</th>
                 <th scope="col">Prepared</th>
                 <th scope="col">Sold</th>
-                <th scope="col">Remaining</th>
                 <th scope="col">Discarded</th>
-                <th scope="col">Carried over</th>
-                <th scope="col">Other</th>
-                <th scope="col">Gap</th>
               </tr>
             </thead>
             <tbody>
-              {draft.map((row) => {
-                const line = closeRows.find((l) => l.productId === row.productId) as ClosingLineItem;
-                const gap = reconciliationGap(line);
-                const entry = closing[row.productId] ?? { discarded: "", carriedOver: "", other: "" };
-                const setEntry = (patch: Partial<typeof entry>) =>
-                  setClosing((prev) => ({ ...prev, [row.productId]: { ...entry, ...patch } }));
-                return (
-                  <tr key={row.productId}>
-                    <td>
-                      <b>{row.name}</b>
-                      <small className="muted"> {row.category}</small>
-                    </td>
-                    <td>{num(row.opening)}</td>
-                    <td>{num(row.prepared)}</td>
-                    <td>{num(row.sold)}</td>
-                    <td><b>{num(row.remaining)}</b></td>
-                    <td>
-                      <input className="input input--num" inputMode="numeric" aria-label={`Discarded ${row.name}`} value={entry.discarded} placeholder="0" onChange={(e) => setEntry({ discarded: e.target.value })} />
-                    </td>
-                    <td>
-                      <input className="input input--num" inputMode="numeric" aria-label={`Carried over ${row.name}`} value={entry.carriedOver} placeholder="0" onChange={(e) => setEntry({ carriedOver: e.target.value })} />
-                    </td>
-                    <td>
-                      <input className="input input--num" inputMode="numeric" aria-label={`Other ${row.name}`} value={entry.other} placeholder="0" onChange={(e) => setEntry({ other: e.target.value })} />
-                    </td>
-                    <td>{gap === 0 ? <StatusPill tone="good">OK</StatusPill> : <StatusPill tone="danger">{qtyLabel(gap)}</StatusPill>}</td>
-                  </tr>
-                );
-              })}
+              {wrapRows.map((row) => (
+                <tr key={row.productId}>
+                  <th scope="row">
+                    <b>{row.name}</b>
+                  </th>
+                  <td>{num(row.prepared)}</td>
+                  <td>{num(row.sold)}</td>
+                  <td>
+                    <b className={row.discarded > 0 ? "discardqty" : "muted"}>{num(row.discarded)}</b>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
-        </div>
-        <div className="dpanel__actions dpanel__actions--inline">
-          {draft.map((row) => (
-            <button
-              key={row.productId}
-              type="button"
-              className="linky"
-              onClick={() =>
-                setClosing((prev) => ({
-                  ...prev,
-                  [row.productId]: {
-                    discarded: String(row.remaining),
-                    carriedOver: "0",
-                    other: "0",
-                  },
-                }))
-              }
-            >
-              Discard all remaining · {row.name}
-            </button>
-          ))}
         </div>
       </DetailPanel>
 
@@ -721,8 +704,8 @@ export function POS() {
           <>
             <DetailSection title="Items">
               <ul className="lines">
-                {selected.items.map((line) => (
-                  <li key={line.productId}>
+                {selected.items.map((line, index) => (
+                  <li key={`${line.productId}-${index}`}>
                     <span>{line.qty} × {line.name} <span className="muted">({peso(line.price)})</span></span>
                     <b>{peso(line.price * line.qty)}</b>
                   </li>
@@ -773,7 +756,7 @@ function CartPanel({
   onClear,
   onCheckout,
 }: {
-  lines: Array<{ productId: string; qty: number; product?: { name: string; price: number; image: string | null } }>;
+  lines: Array<{ productId: string; qty: number; product?: { id: string; name: string; price: number; image: string | null } }>;
   total: number;
   count: number;
   onQty: (productId: string, qty: number) => void;
@@ -799,18 +782,20 @@ function CartPanel({
             {lines.map((line) => (
               <li key={line.productId}>
                 <span className="cartlines__media">
-                  {line.product?.image ? <img src={line.product.image} alt="" /> : null}
+                  {line.product && productImage(line.product) ? (
+                    <img src={productImage(line.product) as string} alt="" loading="lazy" />
+                  ) : null}
                 </span>
                 <span className="cartlines__body">
                   <b>{line.product?.name}</b>
                   <small>{peso(line.product?.price ?? 0)} each</small>
                 </span>
                 <span className="stepper">
-                  <button type="button" aria-label="Decrease" onClick={() => onQty(line.productId, line.qty - 1)}>
+                  <button type="button" aria-label="Decrease quantity" onClick={() => onQty(line.productId, line.qty - 1)}>
                     <Minus className="ico" />
                   </button>
                   <b>{line.qty}</b>
-                  <button type="button" aria-label="Increase" onClick={() => onQty(line.productId, line.qty + 1)}>
+                  <button type="button" aria-label="Increase quantity" onClick={() => onQty(line.productId, line.qty + 1)}>
                     <Plus className="ico" />
                   </button>
                 </span>
