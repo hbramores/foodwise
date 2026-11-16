@@ -57,6 +57,12 @@ export function formatShort(iso: string): string {
   return fromISODate(iso).toLocaleDateString("en-PH", SHORT_FMT);
 }
 
+/** Compact numeric date, e.g. "11/10" — used in narrow mobile table columns. */
+export function formatCompact(iso: string): string {
+  const d = fromISODate(iso);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
 export function formatLongDateObj(d: Date): string {
   return d.toLocaleDateString("en-PH", LONG_FMT);
 }

@@ -226,6 +226,13 @@ export function AppShell({
             <PanelLeft className="ico" />
           </IconButton>
 
+          <span className="top__brand">
+            <span className="top__brand-mark">
+              <BrandMark size={19} />
+            </span>
+            <b>FoodWise PH</b>
+          </span>
+
           <div className="top__crumb">
             <Store className="ico" aria-hidden="true" />
             <span>{restaurantName}</span>

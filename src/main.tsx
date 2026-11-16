@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App";
+import Root from "./Root";
 import "./index.css";
 
 const el = document.getElementById("root");
@@ -8,6 +8,6 @@ if (!el) throw new Error("Root element #root was not found");
 
 createRoot(el).render(
   <StrictMode>
-    <App />
+    <Root />
   </StrictMode>
 );

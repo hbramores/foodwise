@@ -3371,3 +3371,333 @@ body { background: #F8F8F3; color: #252525; }
     padding-bottom: calc(110px + env(safe-area-inset-bottom));
   }
 }
+
+/* =======================================================================
+   Mobile-first UI/UX refinement (320 – 430px priority)
+   ======================================================================= */
+
+/* Base: compact-only elements stay hidden on desktop. */
+.top__brand,
+.five-day-table .day-head-sm,
+.five-day-table .avg-head-sm,
+.five-day-table .day-date-sm {
+  display: none;
+}
+
+/* --- Compact mobile header: brand left, settings right ---------------- */
+
+@media (max-width: 760px) {
+  .top {
+    min-height: 56px;
+    margin-bottom: 14px;
+    padding: 0;
+    gap: 10px;
+  }
+
+  .top__brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+  }
+
+  .top__brand-mark {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    flex: none;
+    border-radius: 9px;
+    background: #244d20;
+    color: #f2d454;
+  }
+
+  .top__brand b {
+    font-size: 15px;
+    letter-spacing: -0.2px;
+    white-space: nowrap;
+  }
+
+  .top__crumb {
+    display: none;
+  }
+
+  .top__actions {
+    margin-left: auto;
+  }
+
+  .top__actions .live {
+    display: none;
+  }
+
+  .top__settings {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+  }
+
+  /* Page heads */
+  .head {
+    margin-bottom: 14px;
+    gap: 10px;
+  }
+
+  .head__title {
+    font-size: 21px;
+    letter-spacing: -0.4px;
+  }
+
+  .head__sub {
+    font-size: 12.5px;
+  }
+
+  .head__actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .head__actions .btn {
+    min-height: 42px;
+  }
+}
+
+/* --- Menu toolbar: search + archived, then scrollable pills ----------- */
+
+.menu-toolbar {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.menu-toolbar__top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.menu-toolbar__top .menu-search {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pillrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding: 2px 2px 6px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 28px), transparent);
+}
+
+.pillrow.is-at-end {
+  mask-image: none;
+}
+
+.pillrow::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-pill {
+  flex: none;
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 1px solid #e4e5dc;
+  background: #fff;
+  color: #5f655a;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background-color 0.18s, border-color 0.18s, color 0.18s;
+}
+
+.filter-pill:hover {
+  border-color: #c9cfbe;
+}
+
+.filter-pill.is-on {
+  background: #e6c547;
+  border-color: #e6c547;
+  color: #244d20;
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .menu-toolbar {
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .filter-pill {
+    padding: 7px 12px;
+    font-size: 12px;
+  }
+
+  .menu-toolbar__top .chip {
+    flex: none;
+  }
+}
+
+/* --- History: fit all seven columns on a phone ----------------------- */
+
+@media (max-width: 760px) {
+  .history-v2-toolbar {
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .history-v2-toolbar > label {
+    gap: 6px;
+    font-size: 11px;
+  }
+
+  .history-v2-toolbar .input {
+    height: 36px;
+    font-size: 13px;
+  }
+
+  .history-v2-paging {
+    gap: 6px;
+  }
+
+  .history-v2-paging .btn {
+    min-height: 34px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .five-day-scroll {
+    overflow-x: auto;
+  }
+
+  .five-day-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  .five-day-table th,
+  .five-day-table td {
+    padding: 5px 2px;
+    font-size: 11px;
+  }
+
+  .five-day-table .dish-col {
+    width: 30%;
+  }
+
+  .five-day-table .day-col {
+    width: 10%;
+  }
+
+  .five-day-table .average-column {
+    width: 20%;
+    min-width: 0;
+  }
+
+  .five-day-table th:first-child {
+    min-width: 0;
+    width: 30%;
+    max-width: none;
+    left: 0;
+    z-index: 2;
+    box-shadow: 2px 0 5px #25252505;
+  }
+
+  .five-day-table tbody th:first-child {
+    background: #fff;
+  }
+
+  .five-day-table thead th:first-child {
+    background: #fafbf7;
+  }
+
+  .five-day-table .sales-record-dish {
+    gap: 0;
+  }
+
+  .five-day-table .sales-record-dish > div {
+    min-width: 0;
+  }
+
+  .five-day-table .sales-record-dish b {
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 1.25;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+
+  .five-day-table .sales-record-dish small {
+    display: none;
+  }
+
+  .five-day-table .average-column {
+    background: #fff7d6;
+  }
+
+  .five-day-table .day-head,
+  .five-day-table .avg-head-lg,
+  .five-day-table .day-date-lg {
+    display: none;
+  }
+
+  .five-day-table .day-head-sm,
+  .five-day-table .avg-head-sm,
+  .five-day-table .day-date-sm {
+    display: block;
+  }
+
+  .day-head-sm {
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    color: #4c5147;
+  }
+
+  .day-date {
+    margin-top: 1px;
+    padding: 0;
+    text-align: center;
+  }
+
+  .day-date-sm {
+    font-size: 9px;
+    color: #8a8d84;
+  }
+
+  .history-sale-cell {
+    min-height: 26px;
+    font-size: 11.5px;
+  }
+
+  .history-average {
+    font-size: 12px;
+  }
+
+  .history-v2-note {
+    font-size: 11px;
+    margin-top: 10px;
+  }
+}
+
+/* --- Daily Recording: keep rows compact and tappable ----------------- */
+
+@media (max-width: 760px) {
+  .sales-record-row {
+    min-height: 60px;
+    padding: 8px 11px;
+  }
+
+  .sales-record-dish label {
+    font-size: 12.5px;
+    line-height: 1.25;
+  }
+
+  .sales-record-input .input {
+    width: 84px;
+    height: 44px;
+  }
+}

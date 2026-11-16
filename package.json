@@ -3,7 +3,7 @@
   "private": true,
   "version": "2.0.0",
   "type": "module",
-  "description": "FoodWise PH \u2014 a frontend-only restaurant sales forecasting system",
+  "description": "FoodWise PH — a frontend-only restaurant sales forecasting system",
   "scripts": {
     "dev": "vite",
     "build": "node node_modules/typescript/bin/tsc -b && node node_modules/vite/bin/vite.js build",
@@ -12,10 +12,15 @@
     "verify": "esbuild scripts/verify.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/foodwise-verify.mjs --log-level=error && node node_modules/.cache/foodwise-verify.mjs"
   },
   "dependencies": {
+    "@react-three/drei": "^9.114.3",
+    "@react-three/fiber": "^8.17.10",
+    "gsap": "^3.12.5",
     "lucide-react": "^0.468.0",
+    "motion": "^11.15.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "recharts": "^2.13.3"
+    "recharts": "^2.13.3",
+    "three": "^0.169.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
