@@ -1,39 +1,42 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
-  ClipboardList,
-  History as HistoryIcon,
-  LayoutGrid,
+  Boxes,
+  LayoutDashboard,
   LogOut,
+  MoreHorizontal,
   PanelLeft,
   PanelLeftClose,
   PanelLeftOpen,
   Settings as SettingsIcon,
-  Store,
+  ShoppingCart,
+  TrendingUp,
+  UtensilsCrossed,
+  X,
 } from "lucide-react";
 import { BrandMark } from "./Brand";
 import { IconButton } from "./ui";
-import { useData } from "../data/store";
+import { useStore } from "../data/store";
 import { ROUTES, type RouteKey } from "../hooks";
-import { todayISO } from "../lib/date";
+import { manilaToday } from "../lib/date";
+import { formatLong } from "../lib/date";
+import { availableServings } from "../lib/calc";
 
-const NAV = [
-  { key: "menu" as RouteKey, label: "Menu", icon: LayoutGrid },
-  { key: "record" as RouteKey, label: "Daily Recording", icon: ClipboardList },
-  { key: "history" as RouteKey, label: "History", icon: HistoryIcon },
-  { key: "settings" as RouteKey, label: "Settings", icon: SettingsIcon },
+const NAV: Array<{ key: RouteKey; label: string; icon: typeof LayoutDashboard }> = [
+  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { key: "pos", label: "POS Selling", icon: ShoppingCart },
+  { key: "forecast", label: "Forecasting", icon: TrendingUp },
+  { key: "inventory", label: "Inventory", icon: Boxes },
+  { key: "menu", label: "Menu & Recipes", icon: UtensilsCrossed },
 ];
 
-/* Mobile bottom navigation: Daily Recording · Menu · History, with Menu centered. */
-const MOBILE_NAV = [
-  { key: "record" as RouteKey, label: "Daily Recording", icon: ClipboardList },
-  { key: "menu" as RouteKey, label: "Menu", icon: LayoutGrid },
-  { key: "history" as RouteKey, label: "History", icon: HistoryIcon },
-];
+const PRIMARY_TABS: RouteKey[] = ["dashboard", "pos", "forecast", "inventory"];
 
 export const SECTION_LABEL: Record<RouteKey, string> = {
-  menu: "Menu",
-  record: "Daily Recording",
-  history: "History",
+  dashboard: "Dashboard",
+  pos: "POS Selling",
+  forecast: "Forecasting",
+  inventory: "Inventory",
+  menu: "Menu & Recipes",
   settings: "Settings",
 };
 
@@ -51,16 +54,10 @@ function useSidebarCollapsed() {
     try {
       localStorage.setItem(SIDEBAR_KEY, collapsed ? "collapsed" : "expanded");
     } catch {
-      /* Storage unavailable; the in-session state still applies. */
+      /* storage unavailable */
     }
   }, [collapsed]);
   return [collapsed, setCollapsed] as const;
-}
-
-function usePendingToday(): number {
-  const { activeDishes, recordFor } = useData();
-  const today = todayISO();
-  return activeDishes.filter((d) => !recordFor(d.id, today)).length;
 }
 
 /* ------------------------------------------------------------------ Sidebar */
@@ -80,9 +77,12 @@ function Sidebar({
   onLogout: () => void;
   onNavigate?: () => void;
 }) {
-  const { data } = useData();
-  const pending = usePendingToday();
+  const { data } = useStore();
   const collapseLabel = collapsed ? "Expand navigation" : "Collapse navigation";
+
+  const pending = data.products
+    .filter((p) => p.status === "active")
+    .reduce((sum, p) => sum + availableServings(data, p.id), 0);
 
   return (
     <aside className="side" aria-label="Primary">
@@ -93,7 +93,7 @@ function Sidebar({
           </span>
           <span className="brand__name">
             FoodWise
-            <small>Sales to servings</small>
+            <small>{data.settings.restaurantName || "Restaurant workspace"}</small>
           </span>
         </span>
         <button
@@ -108,7 +108,7 @@ function Sidebar({
         </button>
       </div>
 
-      <nav className="side__nav">
+      <nav className="side__nav" aria-label="Main">
         <div className="side__group">Workspace</div>
         {NAV.map((item) => {
           const Icon = item.icon;
@@ -128,69 +128,120 @@ function Sidebar({
             >
               <Icon className="ico" aria-hidden="true" />
               <span className="nav__label">{item.label}</span>
-              {item.key === "record" && pending > 0 ? (
-                <span className="nav__badge">{pending}</span>
-              ) : null}
+              {item.key === "pos" && pending > 0 ? <span className="nav__badge">{pending}</span> : null}
             </a>
           );
         })}
+
+        <div className="side__group side__group--gap">System</div>
+        <a
+          href="#/settings"
+          className="nav"
+          data-route="settings"
+          aria-current={route === "settings" ? "page" : undefined}
+          title={collapsed ? "Settings" : undefined}
+          onClick={(e) => {
+            e.preventDefault();
+            navigate("settings");
+            onNavigate?.();
+          }}
+        >
+          <SettingsIcon className="ico" aria-hidden="true" />
+          <span className="nav__label">Settings</span>
+        </a>
       </nav>
 
-      <button
-        type="button"
-        className="side__logout"
-        aria-label="Log out"
-        title="Log out"
-        onClick={onLogout}
-      >
+      <button type="button" className="side__logout" aria-label="Log out" title="Log out" onClick={onLogout}>
         <LogOut className="ico" aria-hidden="true" />
         <span className="nav__label">Log out</span>
       </button>
 
       <div className="side__foot">
-        <b>{data.restaurant?.name ?? "Your restaurant"}</b>
-        <small>{data.restaurant?.type || "Set a restaurant type in Settings"}</small>
+        <b>{data.settings.restaurantName || "Your restaurant"}</b>
+        <small>{formatLong(manilaToday())}</small>
       </div>
     </aside>
   );
 }
 
-/* ------------------------------------------------------------- MobileTabBar */
+/* --------------------------------------------------------------- Mobile nav */
 
-function MobileTabBar({
-  route,
-  navigate,
-}: {
-  route: RouteKey;
-  navigate: (r: RouteKey) => void;
-}) {
-  const pending = usePendingToday();
+function MobileTabBar({ route, navigate }: { route: RouteKey; navigate: (r: RouteKey) => void }) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const overflowActive = route === "menu" || route === "settings";
+
   return (
-    <nav className="tabbar" aria-label="Primary">
-      {MOBILE_NAV.map((item) => {
-        const Icon = item.icon;
-        return (
-          <a
-            key={item.key}
-            href={`#/${item.key}`}
-            className="tabbar__item"
-            aria-current={route === item.key ? "page" : undefined}
-            onClick={(e) => {
-              e.preventDefault();
-              navigate(item.key);
-            }}
-          >
-            <Icon className="ico" aria-hidden="true" />
-            <span>{item.label}</span>
-            {item.key === "record" && pending > 0 ? (
-              <i className="tabbar__badge" aria-hidden="true">
-                {pending}
-              </i>
-            ) : null}
-          </a>
-        );
-      })}
-    </nav>
+    <>
+      {moreOpen ? (
+        <div className="moresheet" role="dialog" aria-label="More sections">
+          <button
+            type="button"
+            className="moresheet__scrim"
+            aria-label="Close"
+            onClick={() => setMoreOpen(false)}
+          />
+          <div className="moresheet__panel">
+            <header className="moresheet__head">
+              <b>More</b>
+              <IconButton label="Close" ghost size="sm" onClick={() => setMoreOpen(false)}>
+                <X className="ico" />
+              </IconButton>
+            </header>
+            {NAV.filter((n) => !PRIMARY_TABS.includes(n.key))
+              .concat([{ key: "settings", label: "Settings", icon: SettingsIcon }])
+              .map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    className="moresheet__item"
+                    aria-current={route === item.key ? "page" : undefined}
+                    onClick={() => {
+                      navigate(item.key);
+                      setMoreOpen(false);
+                    }}
+                  >
+                    <Icon className="ico" aria-hidden="true" />
+                    {item.label}
+                  </button>
+                );
+              })}
+          </div>
+        </div>
+      ) : null}
+
+      <nav className="tabbar" aria-label="Primary">
+        {NAV.filter((item) => PRIMARY_TABS.includes(item.key)).map((item) => {
+          const Icon = item.icon;
+          return (
+            <a
+              key={item.key}
+              href={`#/${item.key}`}
+              className="tabbar__item"
+              aria-current={route === item.key ? "page" : undefined}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate(item.key);
+              }}
+            >
+              <Icon className="ico" aria-hidden="true" />
+              <span>{item.label.replace(" Selling", "").replace(" & Recipes", "")}</span>
+            </a>
+          );
+        })}
+        <button
+          type="button"
+          className="tabbar__item"
+          aria-current={overflowActive ? "page" : undefined}
+          aria-expanded={moreOpen}
+          onClick={() => setMoreOpen((v) => !v)}
+        >
+          <MoreHorizontal className="ico" aria-hidden="true" />
+          <span>More</span>
+        </button>
+      </nav>
+    </>
   );
 }
 
@@ -199,26 +250,27 @@ function MobileTabBar({
 export function AppShell({
   route,
   navigate,
-  sideOpen,
-  setSideOpen,
   onLogout,
   children,
 }: {
   route: RouteKey;
   navigate: (r: RouteKey) => void;
-  sideOpen: boolean;
-  setSideOpen: (v: boolean) => void;
   onLogout: () => void;
   children: ReactNode;
 }) {
-  const { data } = useData();
-  const restaurantName = data.restaurant?.name ?? "FoodWise PH";
+  const { data } = useStore();
   const [collapsed, setCollapsed] = useSidebarCollapsed();
+  const [sideOpen, setSideOpen] = useState(false);
+
+  useEffect(() => {
+    document.title = `FoodWise — ${SECTION_LABEL[route]}`;
+  }, [route]);
 
   return (
-    <div
-      className={`app${sideOpen ? " side-open" : ""}${collapsed ? " app--collapsed" : ""}`}
-    >
+    <div className={`app${sideOpen ? " side-open" : ""}${collapsed ? " app--collapsed" : ""}`}>
+      <div className="appwall" aria-hidden="true" />
+      <div className="appwall__fade" aria-hidden="true" />
+
       <Sidebar
         route={route}
         navigate={navigate}
@@ -228,18 +280,11 @@ export function AppShell({
         onNavigate={() => setSideOpen(false)}
       />
 
-      {sideOpen ? (
-        <div className="side-scrim" onClick={() => setSideOpen(false)} aria-hidden="true" />
-      ) : null}
+      {sideOpen ? <div className="side-scrim" onClick={() => setSideOpen(false)} aria-hidden="true" /> : null}
 
       <div className="frame">
         <header className="top">
-          <IconButton
-            label="Open navigation"
-            ghost
-            className="top__menu"
-            onClick={() => setSideOpen(true)}
-          >
+          <IconButton label="Open navigation" ghost className="top__menu" onClick={() => setSideOpen(true)}>
             <PanelLeft className="ico" />
           </IconButton>
 
@@ -251,27 +296,23 @@ export function AppShell({
           </span>
 
           <div className="top__crumb">
-            <Store className="ico" aria-hidden="true" />
-            <span>{restaurantName}</span>
+            <span>{data.settings.restaurantName || "Restaurant"}</span>
+            <i aria-hidden="true">·</i>
+            <b>{SECTION_LABEL[route]}</b>
           </div>
 
           <div className="top__actions">
-            <span className="live" title="Records are saved in this browser">
+            <span className="live" title="Records are stored in this browser">
               <i aria-hidden="true" />
-              Saved on this device
+              Saved locally
             </span>
-            <IconButton
-              label="Settings"
-              ghost
-              className="top__settings"
-              onClick={() => navigate("settings")}
-            >
+            <IconButton label="Settings" ghost className="top__settings" onClick={() => navigate("settings")}>
               <SettingsIcon className="ico" />
             </IconButton>
           </div>
         </header>
 
-        <main className="page" id="main">
+        <main className={`page${route === "pos" ? " page--wide" : ""}`} id="main">
           {children}
         </main>
       </div>

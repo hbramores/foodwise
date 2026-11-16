@@ -1,55 +1,227 @@
-import {buildDemoData,emptyData,loadData,saveData} from "../src/lib/demo";
-import {computeForecast,recentRecordedDates,saleForDate} from "../src/lib/forecast";
-import {validateSalesInput} from "../src/lib/recordValidation";
-import {addDaysISO,todayISO} from "../src/lib/date";
-import type {DailyRecord} from "../src/types";
-const data=buildDemoData();
-let failures=0;
-function check(condition:boolean,label:string) {console.log(`${condition ? "PASS" : "FAIL"} ${label}`);if(!condition)failures++;}
-const expected=[10,42,17,23,16,17];
-const supplied=[[12,8,10,11,9],[41,47,36,44,42],[18,22,11,16,18],[23,18,28,21,25],[21,16,11,18,14],[16,18,16,20,15]];
-const dates=recentRecordedDates(data.records);
-check(dates.length===5 && data.records.length===30,"Complete five-day seed data");
-check(data.dishes.length===6 && data.dishes.map(d=>d.ingredients.length).join(",")==="10,8,9,8,2,4","Six mandatory dishes and complete ingredient lists");
-for(const [i,dish] of data.dishes.entries()) {
- const result=computeForecast(data.records,dish.id,dates);
- check(result.values.join(",")===supplied[i].join(","),`Exact sales: ${dish.name}`);
- check(result.recommended===expected[i],`Shared Menu / History average: ${dish.name} = ${expected[i]}`);
+import { buildSeedData } from "../src/lib/seed";
+import {
+  checkout,
+  closeOperatingDay,
+  prepareServings,
+  setRecipe,
+  setTransactionStatus,
+  upsertProduct,
+  applyStockMovement,
+} from "../src/lib/actions";
+import {
+  availableServings,
+  forecastFor,
+  kpis,
+  periodRange,
+  reconciliationGap,
+  stockState,
+  wasteSummary,
+} from "../src/lib/calc";
+import { manilaToday } from "../src/lib/date";
+import { convertQty } from "../src/lib/units";
+import type { AppData, ClosingLineItem } from "../src/types";
+
+let failures = 0;
+function check(condition: boolean, label: string) {
+  console.log(`${condition ? "PASS" : "FAIL"} ${label}`);
+  if (!condition) failures += 1;
 }
-const first=data.dishes[0].id;
-const one=data.records.filter(r=>r.dishId===first).slice(0,1);
-check(computeForecast(one,first).recommended===12,"One available record produces a limited-history recommendation");
-const none=computeForecast([],first);
-check(none.recommended===null && none.averageSales===null,"No invented recommendation with no records");
-const zeros=one.map(r=>({...r,sold:0}));
-check(computeForecast(zeros,first).recommended===0,"Recorded zero is included");
-const sparse=data.records.filter(r=>r.dishId!==first || r.date===dates[4]);
-const sparseResult=computeForecast(sparse,first);
-check(sparseResult.eligibleDays===1 && sparseResult.recommended===9 && sparseResult.values.filter(v=>v===null).length===4,"Missing cells show gaps and average divides only by available records");
-const old:DailyRecord={...one[0],id:"old",date:addDaysISO(dates[0],-10),sold:999};
-check(computeForecast([...sparse,old],first).recommended===9,"Shared restaurant dates prevent backfilling missing cells from older dish dates");
-const sixth:DailyRecord={...one[0],id:"new",date:todayISO(),sold:20};
-const rolled=recentRecordedDates([...data.records,sixth]);
-check(rolled.join(",")===[...dates.slice(1),todayISO()].join(","),"Sixth day rolls the five-date window chronologically");
-check(data.records.length===30 && computeForecast([...data.records,sixth],first).recommended===12,"Rolling recommendation updates while original history is kept");
-const edited=data.records.map(r=>r.dishId===first && r.date===dates[0] ? {...r,sold:22} : r);
-check(computeForecast(edited,first).recommended===12,"Editing sales recalculates the rounded average");
-const deleted=data.records.filter(r=>!(r.dishId===first && r.date===dates[0]));
-check(computeForecast(deleted,first).eligibleDays===4 && computeForecast(deleted,first).recommended===10,"Deleting a sale updates count and average without deleting other sales");
-const half=[{...one[0],sold:1},{...one[0],id:"half2",date:addDaysISO(one[0].date,1),sold:2}];
-check(computeForecast(half,first).recommended===2,"Standard nonnegative half-up rounding");
-check(saleForDate(data.records,first,dates[0])?.sold===12,"Lookup uses stable dish and date identifiers");
-check(!validateSalesInput("0").error && validateSalesInput("0").quantity===0,"Zero is valid input");
-check(validateSalesInput("").quantity===null && !validateSalesInput("").error,"Blank stays distinct from zero");
-check(Boolean(validateSalesInput("",false).error),"Clearing an existing record requires explicit removal");
-for(const invalid of ["-1","1.5","1e2","hello","Infinity","9007199254740992"]) check(Boolean(validateSalesInput(invalid).error),`Reject invalid quantity: ${invalid}`);
-let stored:string|null=null;
-Object.defineProperty(globalThis,"localStorage",{value:{getItem:()=>stored,setItem:(_key:string,value:string)=>{stored=value;},removeItem:()=>{stored=null;}},configurable:true});
-const changed=structuredClone(data);changed.dishes[0].name="Renamed Calamares";changed.dishes[0].ingredients=["Edited squid","Lemon"];changed.dishes[0].status="archived";
-saveData(changed);const restored=loadData();
-check(restored.dishes[0].name==="Renamed Calamares" && restored.dishes[0].ingredients[0]==="Edited squid","Dish edits and ingredients persist after refresh");
-check(restored.dishes[0].status==="archived" && restored.records.length===30,"Archiving preserves linked historical sales");
-check(JSON.stringify(restored.records)===JSON.stringify(changed.records),"Refresh never replaces existing user sales with demo data");
-saveData(emptyData());check(loadData().dishes.length===0 && loadData().records.length===0,"Clear data stays empty after refresh without reseeding or a welcome gate");
-console.log(failures ? `${failures} CHECK(S) FAILED` : "ALL CHECKS PASSED");
-process.exit(failures?1:0);
+
+const today = manilaToday();
+const seed = buildSeedData();
+
+/* ---------------------------------------------------------------- seeding */
+
+check(seed.products.length === 6, "Six seeded menu products");
+check(seed.ingredients.length === 29, "Twenty-nine seeded ingredients");
+check(
+  seed.products.every((p) => seed.recipes.some((r) => r.productId === p.id)),
+  "Every product has a recipe"
+);
+check(
+  Object.values(
+    seed.recipes.reduce<Record<string, number>>((acc, r) => {
+      acc[r.productId] = (acc[r.productId] ?? 0) + 1;
+      return acc;
+    }, {})
+  ).join(",") === "10,8,9,8,2,4",
+  "Recipe line counts match the PRD (10, 8, 9, 8, 2, 4)"
+);
+check(seed.days.filter((d) => d.status === "closed").length === 5, "Five closed seeded operating days");
+check(seed.days.filter((d) => d.status === "open").length === 1, "Today starts as an open operating day");
+check(seed.transactions.length === 30, "Thirty seeded POS transactions");
+check(seed.closings.length === 5, "Five seeded closing records");
+
+/* ------------------------------------------------------------- forecasting */
+
+const expected = [10, 42, 17, 23, 16, 17];
+seed.products.forEach((product, i) => {
+  const f = forecastFor(seed, product.id);
+  check(f.validDays === 5, `Five valid days recorded: ${product.name}`);
+  check(f.recommended === expected[i], `Recommendation matches the PRD: ${product.name} = ${expected[i]}`);
+});
+
+/* --------------------------------------------------- inventory consistency */
+
+check(
+  seed.ingredients.every((ingredient) => {
+    const moves = seed.movements.filter((m) => m.ingredientId === ingredient.id);
+    const last = moves[moves.length - 1];
+    return last ? Math.abs(last.balanceAfter - ingredient.stock) < 0.0001 : true;
+  }),
+  "Every ingredient's movement ledger ends at its current stock"
+);
+
+/* ---------------------------------------------- acceptance workflow (§12) */
+
+let data: AppData = seed;
+const chicken = data.products.find((p) => p.name === "Fried Chicken") as { id: string };
+const chickenIngredient = data.ingredients.find((i) => i.name === "Chicken pieces") as { id: string; stock: number };
+
+check(availableServings(data, chicken.id) === 0, "Fried Chicken starts with no prepared servings");
+const stockBefore = chickenIngredient.stock;
+
+// 4. prepare 50 servings
+const prep = prepareServings(data, { productId: chicken.id, servings: 50 });
+check(prep.ok, "Preparing 50 Fried Chicken servings is accepted");
+if (prep.ok) data = prep.data;
+
+// 5. availability increases by 50
+check(availableServings(data, chicken.id) === 50, "Availability increases by exactly 50");
+
+// 6. inventory deducts 10 kg of chicken plus the other recipe ingredients
+const afterPrep = data.ingredients.find((i) => i.id === chickenIngredient.id) as { stock: number };
+check(Math.abs(stockBefore - afterPrep.stock - 10) < 0.0001, "Chicken pieces deduct 10 kg (200 g × 50)");
+check(
+  data.movements.filter((m) => m.ref === (prep.ok ? prep.batch.id : "")).length === 8,
+  "One inventory movement per recipe line (8 lines)"
+);
+check(
+  data.batches.filter((b) => b.productId === chicken.id && b.date === today).length === 1,
+  "Exactly one preparation batch recorded"
+);
+
+// 7. sell two servings
+const sale = checkout(data, { cart: [{ productId: chicken.id, qty: 2 }], payment: "Cash", received: 500 });
+check(sale.ok, "Selling two Fried Chicken servings succeeds");
+if (sale.ok) data = sale.data;
+
+// 8. availability decreases to 48
+check(availableServings(data, chicken.id) === 48, "Availability decreases to 48 after selling two");
+
+// 9. raw ingredients are not deducted again
+const afterSale = data.ingredients.find((i) => i.id === chickenIngredient.id) as { stock: number };
+check(afterSale.stock === afterPrep.stock, "Checkout does not deduct raw ingredients again");
+
+// 10. sale appears in history with a timestamp
+const recorded = data.transactions.find((t) => sale.ok && t.id === sale.txn.id);
+check(Boolean(recorded?.at && recorded?.code), "The sale is stored with a receipt code and timestamp");
+check(recorded?.status === "completed", "The sale is stored as completed");
+
+// 11. dashboard figures update
+const dayRange = periodRange("today", today);
+check(kpis(data, dayRange).sales === 258, "Dashboard sales include the new order (₱258)");
+check(kpis(data, dayRange).sold === 2, "Dashboard servings sold updates to 2");
+
+// 12. forecasting reflects the POS history
+check(forecastFor(data, chicken.id).validDays === 5, "Forecasting still uses the latest five recorded days");
+check(forecastFor(data, chicken.id).values.at(-1) === 2, "Today's sale feeds the forecasting window");
+
+/* --------------------------------------------------------- integrity guards */
+
+check(!checkout(data, { cart: [{ productId: chicken.id, qty: 999 }], payment: "Cash", received: 0 }).ok, "Cannot sell beyond prepared availability");
+check(!checkout(data, { cart: [], payment: "Cash" }).ok, "Empty cart is rejected");
+check(!checkout(data, { cart: [{ productId: chicken.id, qty: 1 }], payment: "Cash", received: 1 }).ok, "Cash under the total is rejected");
+check(!prepareServings(data, { productId: chicken.id, servings: 0 }).ok, "Zero servings cannot be prepared");
+check(!prepareServings(data, { productId: chicken.id, servings: -5 }).ok, "Negative servings cannot be prepared");
+
+const key = "idem-test-1";
+const first = checkout(data, { cart: [{ productId: chicken.id, qty: 1 }], payment: "GCash", idempotencyKey: key });
+if (first.ok) data = first.data;
+const duplicate = checkout(data, { cart: [{ productId: chicken.id, qty: 1 }], payment: "GCash", idempotencyKey: key });
+check(!duplicate.ok, "A repeated submission with the same key is ignored");
+check(availableServings(data, chicken.id) === 47, "Duplicate submission did not change availability");
+
+// void restores availability and net sales
+const voided = sale.ok ? setTransactionStatus(data, sale.txn.id, "voided", "test") : data;
+data = voided;
+check(availableServings(data, chicken.id) === 49, "Voiding a sale returns its servings");
+check(kpis(data, dayRange).sales === 129, "Voiding removes the order from net sales");
+
+/* --------------------------------------------------------------- closing */
+
+const closedDay = data.closings[0];
+check(closedDay.lines.every((l) => reconciliationGap(l) === 0), "Seeded closed days are fully reconciled");
+check(wasteSummary(data, periodRange("month", today)).discarded === 10, "Waste summary reads the closing records (10 seeded)");
+
+const badLines: ClosingLineItem[] = [
+  { productId: chicken.id, opening: 0, prepared: 50, sold: 3, remaining: 47, discarded: 0, carriedOver: 0, other: 0 },
+];
+check(!closeOperatingDay(data, today, badLines).ok, "Closing is blocked until every serving is reconciled");
+
+const goodLines: ClosingLineItem[] = [
+  { productId: chicken.id, opening: 0, prepared: 50, sold: 3, remaining: 47, discarded: 2, carriedOver: 45, other: 0 },
+];
+const closed = closeOperatingDay(data, today, goodLines);
+check(closed.ok, "A reconciled day closes successfully");
+if (closed.ok) data = closed.data;
+check(data.days.find((d) => d.date === today)?.status === "closed", "The operating day is marked closed");
+check(availableServings(data, chicken.id) === 47, "Discarding removes 2 servings and carry-over keeps 45");
+check(wasteSummary(data, periodRange("today", today)).discarded === 2, "Today's closing feeds the waste summary");
+check(data.closings.some((c) => c.date === today), "A closing record is stored for today");
+
+/* ------------------------------------------------------- menu & inventory */
+
+const withProduct = upsertProduct(data, {
+  name: "Test Dish",
+  category: "Main Course",
+  price: 199,
+  image: null,
+  description: "Test",
+});
+check(withProduct.data.products.length === 7, "Adding a product appends to the shared catalogue");
+const withRecipe = setRecipe(withProduct.data, withProduct.id, [{ ingredientId: "ing-chicken", qty: 250, unit: "g" }]);
+check(
+  withRecipe.recipes.filter((r) => r.productId === withProduct.id).length === 1,
+  "Saving a recipe replaces that product's lines"
+);
+
+const ingredientForMove = withRecipe.ingredients.find((i) => i.id === "ing-chicken") as { stock: number };
+const restocked = applyStockMovement(withRecipe, "ing-chicken", "restock", 5, "delivery");
+check(
+  Math.abs((restocked.ingredients.find((i) => i.id === "ing-chicken") as { stock: number }).stock - (ingredientForMove.stock + 5)) < 0.0001,
+  "Restocking adds stock and writes a movement"
+);
+
+/* ------------------------------------------------- no negative quantities */
+
+const drained = applyStockMovement(restocked, "ing-garlicpowder", "loss", -999, "test drain");
+const drainedStock = (drained.ingredients.find((i) => i.id === "ing-garlicpowder") as { stock: number }).stock;
+check(drainedStock === 0, "A loss can never push stock below zero");
+const lastMove = drained.movements.filter((m) => m.ingredientId === "ing-garlicpowder").at(-1);
+check(lastMove?.balanceAfter === 0, "The movement ledger matches the floored stock");
+
+const overPrepared = prepareServings(drained, { productId: chicken.id, servings: 5000, override: true });
+check(overPrepared.ok, "An explicit override still confirms the batch");
+if (overPrepared.ok) {
+  check(
+    overPrepared.data.ingredients.every((i) => i.stock >= 0),
+    "Override preparation never writes a negative stock"
+  );
+  check(
+    overPrepared.data.ingredients.every((i) => {
+      const moves = overPrepared.data.movements.filter((m) => m.ingredientId === i.id);
+      const last = moves[moves.length - 1];
+      return last ? Math.abs(last.balanceAfter - i.stock) < 0.0001 : true;
+    }),
+    "Every ledger still ends at its current stock after an override"
+  );
+}
+
+const levels = stockState(restocked);
+check(levels.out.length + levels.low.length + levels.normal.length === 29, "Stock status partitions every ingredient");
+check(convertQty(200, "g", "kg") === 0.2, "Unit conversion: 200 g to kg");
+check(convertQty(1, "kg", "pcs") === null, "Incompatible units are rejected");
+
+console.log(failures ? `\n${failures} CHECK(S) FAILED` : "\nALL CHECKS PASSED");
+if (failures) process.exit(1);

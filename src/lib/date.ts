@@ -83,3 +83,64 @@ export function isBefore(a: string, b: string): boolean {
 export function isAfter(a: string, b: string): boolean {
   return a > b;
 }
+
+/* ------------------------------------------------- Asia/Manila (PRD §3.3) */
+
+export const MANILA_TZ = "Asia/Manila";
+
+const MANILA_DAY = new Intl.DateTimeFormat("en-CA", {
+  timeZone: MANILA_TZ,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+const MANILA_STAMP = new Intl.DateTimeFormat("en-PH", {
+  timeZone: MANILA_TZ,
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+const MANILA_CLOCK = new Intl.DateTimeFormat("en-PH", {
+  timeZone: MANILA_TZ,
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+/** Today's operating date in Asia/Manila, as YYYY-MM-DD. */
+export function manilaToday(): string {
+  return MANILA_DAY.format(new Date());
+}
+
+/** "Nov 16, 2026, 10:24 AM" in Asia/Manila. */
+export function manilaStamp(iso: string): string {
+  return MANILA_STAMP.format(new Date(iso));
+}
+
+/** "10:24 AM" in Asia/Manila. */
+export function manilaTime(iso: string): string {
+  return MANILA_CLOCK.format(new Date(iso));
+}
+
+/** Monday of the week containing `iso`. */
+export function weekStartISO(iso: string): string {
+  const d = fromISODate(iso);
+  const offset = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - offset);
+  return toISODate(d);
+}
+
+/** First day of the month containing `iso`. */
+export function monthStartISO(iso: string): string {
+  return `${iso.slice(0, 7)}-01`;
+}
+
+/** The `n` dates ending at (and including) `iso`, oldest first. */
+export function lastNDates(iso: string, n: number): string[] {
+  const out: string[] = [];
+  for (let i = n - 1; i >= 0; i -= 1) out.push(addDaysISO(iso, -i));
+  return out;
+}

@@ -129,11 +129,13 @@ export function Drawer({
   open,
   onClose,
   label,
+  className,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   label: string;
+  className?: string;
   children: ReactNode;
 }) {
   const entered = useEnter(open);
@@ -150,7 +152,7 @@ export function Drawer({
       <div className={cx("scrim", entered && "is-open")} onClick={onClose} aria-hidden="true" />
       <div
         ref={panelRef}
-        className={cx("drawer", entered && "is-open")}
+        className={cx("drawer", className, entered && "is-open")}
         role="dialog"
         aria-modal="true"
         aria-label={label}

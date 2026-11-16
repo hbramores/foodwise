@@ -1,7 +1,7 @@
 /**
  * Static content used by the cinematic landing page. Values mirror the
- * FoodWise PH demo data exactly (see src/lib/demo.ts and scripts/verify.ts)
- * so the marketing story never disagrees with the working prototype.
+ * foodwise workspace seed data exactly (see src/lib/seed.ts and
+ * scripts/verify.ts) so the marketing story never disagrees with the app.
  */
 
 export interface LandingDish {
@@ -118,7 +118,7 @@ export interface ForecastResult {
   recommended: number | null;
 }
 
-/** Mirrors computeForecast() in src/lib/forecast.ts (recorded values only). */
+/** Mirrors forecastFor() in src/lib/calc.ts (recorded values only). */
 export function forecastFrom(values: (number | null)[]): ForecastResult {
   const used = values.filter((v): v is number => v !== null && Number.isFinite(v));
   const total = used.reduce((sum, v) => sum + v, 0);

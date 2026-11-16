@@ -1,40 +1,34 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export const ROUTES = ["menu", "record", "history", "settings"] as const;
+export const ROUTES = ["dashboard", "pos", "forecast", "inventory", "menu", "settings"] as const;
 export type RouteKey = (typeof ROUTES)[number];
+
+export const DEFAULT_ROUTE: RouteKey = "dashboard";
 
 function parseHash(): RouteKey {
   const h = window.location.hash.replace(/^#\/?/, "");
-  return (ROUTES as readonly string[]).includes(h) ? (h as RouteKey) : "menu";
+  return (ROUTES as readonly string[]).includes(h) ? (h as RouteKey) : DEFAULT_ROUTE;
 }
 
-export function useRoute(beforeExternalNavigation?: (next: RouteKey) => boolean) {
+export function useRoute() {
   const [route, setRoute] = useState<RouteKey>(() => parseHash());
-
   const currentRoute = useRef(route);
-  const externalGuard = useRef(beforeExternalNavigation);
-  externalGuard.current = beforeExternalNavigation;
+
   useEffect(() => {
     const onHash = () => {
       const next = parseHash();
       if (next === currentRoute.current) return;
-      if (externalGuard.current && !externalGuard.current(next)) {
-        window.history.replaceState(null, "", `#/${currentRoute.current}`);
-        return;
-      }
       currentRoute.current = next;
       setRoute(next);
     };
     window.addEventListener("hashchange", onHash);
-    if (!window.location.hash) window.location.replace("#/menu");
+    if (!window.location.hash) window.location.replace(`#/${DEFAULT_ROUTE}`);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
   const navigate = useCallback((next: RouteKey) => {
     currentRoute.current = next;
-    if (window.location.hash !== `#/${next}`) {
-      window.location.hash = `#/${next}`;
-    }
+    if (window.location.hash !== `#/${next}`) window.location.hash = `#/${next}`;
     setRoute(next);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
