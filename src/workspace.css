@@ -1644,7 +1644,7 @@
 
 
 /* =======================================================================
-   Responsiveness & interaction pass (PRD A1�A7)
+   Responsiveness & interaction pass (PRD A1—A7)
    ======================================================================= */
 
 /* --- A1: consistent interaction feedback ----------------------------- */
@@ -1821,24 +1821,31 @@
 
 
 /* =======================================================================
-   Mobile-only refinements (PRD B1�B12). Desktop is untouched.
+   Mobile-only refinements (PRD B1—B12). Desktop is untouched.
    ======================================================================= */
 
 @media (max-width: 760px) {
-  /* B6 � the search field owns a row and the filters scroll inside their own. */
-  .toolbar > .search,
-  .menu-toolbar__top > .search {
+  /* B6 — with pill filters the search owns a row and the pills scroll. */
+  .toolbar--pills > .search {
     flex: 1 1 100%;
     width: 100%;
   }
 
-  .toolbar > .pillrow,
-  .menu-toolbar > .pillrow {
+  .toolbar--pills > .pillrow {
     flex: 1 1 100%;
     width: 100%;
   }
 
-  /* B1 � the tab bar is pinned to the viewport, above the safe area. */
+  /* D8 / D10 — search and the category dropdown share a single row.
+     `!important` here cancels the legacy `.toolbar .search` rule in
+     index.css that pinned the field to a full row. */
+  .toolbar--row > .search {
+    flex: 1 1 0 !important;
+    width: auto !important;
+    min-width: 0;
+  }
+
+  /* B1 — the tab bar is pinned to the viewport, above the safe area. */
   .tabbar {
     position: fixed;
     left: 0;
@@ -1853,7 +1860,7 @@
     padding-bottom: calc(200px + env(safe-area-inset-bottom));
   }
 
-  /* B2 � Dashboard KPIs become a 2 � 2 grid. */
+  /* B2 — Dashboard KPIs become a 2 × 2 grid. */
   .kpis--dash {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
@@ -1885,7 +1892,7 @@
     font-size: 21px;
   }
 
-  /* B10 � Inventory summaries sit in a single compact row. */
+  /* B10 — Inventory summaries sit in a single compact row. */
   .kpis--inv {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
@@ -1918,7 +1925,7 @@
     font-size: 19px;
   }
 
-  /* B4 � POS intro copy is hidden; operational controls stay. */
+  /* B4 — POS intro copy is hidden; operational controls stay. */
   .head--intro .head__lead {
     display: none;
   }
@@ -1929,7 +1936,7 @@
     margin-bottom: 2px;
   }
 
-  /* B5 � POS actions collapse to icon-only buttons. */
+  /* B5 — POS actions collapse to icon-only buttons. */
   .btn--compact-mobile {
     min-width: 46px;
     min-height: 46px;
@@ -1941,7 +1948,7 @@
     display: none;
   }
 
-  /* B7/B8 � preparation and wrap-up panels start at the table. */
+  /* B7/B8 — preparation and wrap-up panels start at the table. */
   .drawer--compact-head .dpanel__head {
     display: none;
   }
@@ -1958,12 +1965,12 @@
     margin-bottom: 2px;
   }
 
-  /* B9 � the forecast explainer is desktop-only. */
+  /* B9 — the forecast explainer is desktop-only. */
   .banner--hint {
     display: none;
   }
 
-  /* B11/B12 � compact tables and lists. */
+  /* B11/B12 — compact tables and lists. */
   .table th,
   .table td {
     padding: 8px 7px;
@@ -2071,5 +2078,427 @@
 
   .posgrid {
     gap: 8px;
+  }
+}
+
+/* =======================================================================
+   Premium detail panels (PRD Part C) — shared across Forecast, Product,
+   Ingredient and Transaction drawers.
+   ======================================================================= */
+
+/* Compact, consistently proportioned hero image inside a panel. */
+.dpanel__media {
+  width: min(100%, 320px);
+  max-width: 320px;
+  margin-inline: auto;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--fw-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--fw-depth), var(--fw-shadow-sm);
+}
+
+.dpanel__img {
+  max-height: none;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dpanel {
+  gap: 16px;
+}
+
+.dsect {
+  gap: 8px;
+}
+
+/* --- Gold recommendation callout -------------------------------------- */
+
+.goldcard {
+  display: grid;
+  gap: 2px;
+  padding: 16px 18px;
+  border-radius: var(--fw-radius-lg);
+  border: 1px solid rgba(230, 197, 71, 0.55);
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(255, 255, 255, 0.55), transparent 60%),
+    linear-gradient(160deg, #fff8dc, var(--fw-soft-gold) 55%, #fdf1c4);
+  box-shadow: var(--fw-depth), 0 12px 26px -20px rgba(140, 110, 10, 0.7);
+}
+
+.goldcard__label {
+  color: #6d5410;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.goldcard__value {
+  font: 400 clamp(38px, 9vw, 52px) / 1 var(--font-display, inherit);
+  color: var(--fw-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.goldcard__basis {
+  margin-top: 2px;
+  color: #6d5410;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* --- Compact information grid ----------------------------------------- */
+
+.infogrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.info {
+  padding: 10px 12px;
+  border: 1px solid var(--fw-line);
+  border-radius: var(--fw-radius-md);
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.info b {
+  display: block;
+  font: 400 20px/1.15 var(--font-display, inherit);
+  color: var(--fw-primary-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.info span {
+  color: var(--fw-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+/* --- Mini bar chart for recent sales ---------------------------------- */
+
+.sparkbars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 108px;
+  padding: 8px 4px 0;
+  border: 1px solid var(--fw-line);
+  border-radius: var(--fw-radius-md);
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.sparkbars__col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  height: 100%;
+}
+
+.sparkbars__col i {
+  width: 100%;
+  max-width: 30px;
+  min-height: 4px;
+  border-radius: 6px 6px 3px 3px;
+  background: linear-gradient(180deg, var(--fw-gold-bright), #c9a92f);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.sparkbars__col b {
+  font-size: 11.5px;
+  color: var(--fw-primary-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.sparkbars__col small {
+  color: var(--fw-muted);
+  font-size: 9.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* --- Product panel meta strip ----------------------------------------- */
+
+.pdpm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: -4px;
+}
+
+.pdpm__cat {
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: rgba(47, 101, 41, 0.1);
+  color: var(--fw-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.pdpm__price {
+  margin-left: auto;
+  font: 400 20px/1 var(--font-display, inherit);
+  color: var(--fw-primary-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tighter list rendering inside panels. */
+.lines li {
+  padding: 1px 0;
+}
+
+@media (max-width: 760px) {
+  .dpanel__media {
+    width: 100%;
+    max-width: none;
+  }
+
+  .goldcard__value {
+    font-size: 40px;
+  }
+
+  .sparkbars {
+    height: 96px;
+  }
+}
+
+
+/* =======================================================================
+   Mobile refinements, part D (D1-D10)
+   ======================================================================= */
+
+/* Compact / full label pairs: full text on desktop, short text on mobile. */
+.sm {
+  display: none;
+}
+
+/* Status dot used by the mobile sales history. */
+.sdot {
+  display: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.sdot--completed {
+  background: var(--fw-primary);
+  box-shadow: 0 0 0 3px rgba(47, 101, 41, 0.16);
+}
+
+.sdot--refunded {
+  background: #d9a125;
+  box-shadow: 0 0 0 3px rgba(217, 161, 37, 0.2);
+}
+
+.sdot--voided {
+  background: #be3c32;
+  box-shadow: 0 0 0 3px rgba(190, 60, 50, 0.18);
+}
+
+/* Category dropdown next to a search field. */
+.catselect {
+  flex: 0 0 auto;
+  min-width: 168px;
+  height: 44px;
+  cursor: pointer;
+}
+
+/* Inline stock adjustment row inside the ingredient panel. */
+.stockrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stockrow > .input:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.stockrow > .input--num {
+  flex: 0 0 84px;
+  height: 44px;
+}
+
+.stockrow > .btn {
+  flex: 0 0 auto;
+}
+
+/* Quick actions: full labels on desktop, stacked 2 x 2 tiles on mobile. */
+.qbtn .qbtn__short {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  /* D1 — quick actions become a compact 2 x 2 grid of icon + label. */
+  .quickactions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .quickactions .qbtn {
+    flex-direction: column;
+    gap: 6px;
+    min-height: 78px;
+    padding: 10px 6px;
+    font-size: 11.5px;
+    line-height: 1.2;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .quickactions .qbtn .qbtn__long {
+    display: none;
+  }
+
+  .quickactions .qbtn .qbtn__short {
+    display: inline;
+  }
+
+  .quickactions .qbtn .ico {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* D2 — compact sales history. */
+  .saleshis .col-pay {
+    display: none;
+  }
+
+  .saleshis th,
+  .saleshis td {
+    padding: 7px 5px;
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+
+  .saleshis .status {
+    display: none;
+  }
+
+  .saleshis .sdot {
+    display: inline-block;
+  }
+
+  .saleshis .rcpt {
+    font-size: 11.5px;
+  }
+
+  /* D4 — the comparison fits without horizontal scrolling. */
+  .forecast-table {
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .forecast-table th:nth-child(1) {
+    width: 34%;
+  }
+
+  .forecast-table th:nth-child(n + 2) {
+    width: 16.5%;
+  }
+
+  .forecast-table th,
+  .forecast-table td {
+    padding: 7px 4px;
+    font-size: 11.5px;
+    text-align: center;
+  }
+
+  .forecast-table th[scope="row"],
+  .forecast-table td:first-child {
+    text-align: left;
+  }
+
+  .forecast-table th[scope="row"] {
+    white-space: normal;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+
+  /* D6 / D11 — the inventory table fits without horizontal scrolling. */
+  .invtable {
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .invtable th:nth-child(1) {
+    width: 44%;
+  }
+
+  .invtable th:nth-child(3) {
+    width: 32%;
+  }
+
+  .invtable th:last-child {
+    width: 24%;
+  }
+
+  .invtable th,
+  .invtable td {
+    padding: 7px 5px;
+    font-size: 11.5px;
+  }
+
+  .invtable th[scope="row"] {
+    font-size: 12px;
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
+
+  .invtable .stockqty {
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+
+  .invtable .rowactions .ibtn {
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+  }
+
+  .invtable td:last-child,
+  .invtable th:last-child {
+    text-align: right;
+    padding-right: 4px;
+  }
+
+  .catselect {
+    flex: 0 1 124px;
+    min-width: 108px;
+    padding: 0 8px;
+    font-size: 12.5px;
+  }
+
+  /* Labels swap to the short mobile wording. */
+  .lg {
+    display: none;
+  }
+
+  .sm {
+    display: inline;
+  }
+}
+
+@media (max-width: 360px) {
+  .catselect {
+    flex: 0 1 104px;
+    min-width: 96px;
+    font-size: 11.5px;
+  }
+
+  .quickactions .qbtn {
+    min-height: 70px;
+    font-size: 10.5px;
   }
 }

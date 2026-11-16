@@ -175,17 +175,33 @@ export function Dashboard({ navigate }: { navigate: (r: RouteKey) => void }) {
 
       <Card title="Quick Actions" icon={<ArrowRight className="ico" />}>
         <div className="quickactions">
-          <Button icon={<ShoppingCart className="ico" />} onClick={() => navigate("pos")}>
-            Open POS
+          <Button className="qbtn" icon={<ShoppingCart className="ico" />} onClick={() => navigate("pos")}>
+            <span className="qbtn__long">Open POS</span>
+            <span className="qbtn__short">POS</span>
           </Button>
-          <Button variant="accent" icon={<ChefHat className="ico" />} onClick={() => navigate("pos")}>
-            Add Prepared Food
+          <Button
+            className="qbtn"
+            variant="accent"
+            icon={<ChefHat className="ico" />}
+            onClick={() => {
+              try {
+                sessionStorage.setItem("foodwise:openPrep", "1");
+              } catch {
+                /* storage unavailable — the POS still opens */
+              }
+              navigate("pos");
+            }}
+          >
+            <span className="qbtn__long">Add Prepared Food</span>
+            <span className="qbtn__short">Prepare</span>
           </Button>
-          <Button variant="soft" icon={<TrendingUp className="ico" />} onClick={() => navigate("forecast")}>
-            View Forecast
+          <Button className="qbtn" variant="soft" icon={<TrendingUp className="ico" />} onClick={() => navigate("forecast")}>
+            <span className="qbtn__long">View Forecast</span>
+            <span className="qbtn__short">Forecast</span>
           </Button>
-          <Button variant="soft" icon={<ClipboardList className="ico" />} onClick={() => navigate("inventory")}>
-            View Inventory
+          <Button className="qbtn" variant="soft" icon={<ClipboardList className="ico" />} onClick={() => navigate("inventory")}>
+            <span className="qbtn__long">View Inventory</span>
+            <span className="qbtn__short">Inventory</span>
           </Button>
         </div>
         <p className="note">

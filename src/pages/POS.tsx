@@ -30,7 +30,7 @@ import {
 } from "../types";
 import { availableServings, closingDraft, forecastFor, requirementFor } from "../lib/calc";
 import { productImage, productInitial } from "../lib/images";
-import { formatLong, manilaStamp, manilaToday } from "../lib/date";
+import { formatLong, formatStamp, manilaStamp, manilaToday } from "../lib/date";
 import { num, parseNumberInput, peso } from "../lib/format";
 import { round3, qtyLabel } from "../lib/units";
 
@@ -69,6 +69,18 @@ export function POS() {
 
   const day = data.days.find((d) => d.date === today);
   const dayClosed = day?.status === "closed";
+
+  // The Dashboard's "Prepare" quick action hands off to this panel.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem("foodwise:openPrep") === "1") {
+        sessionStorage.removeItem("foodwise:openPrep");
+        setPrepOpen(true);
+      }
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
 
   const activeProducts = useMemo(() => data.products.filter((p) => p.status === "active"), [data.products]);
 
@@ -246,7 +258,8 @@ export function POS() {
             className="btn--compact-mobile"
             icon={<ChefHat className="ico" />}
             aria-label="Add Prepared Food"
-            title="Add Prepared Food"
+            title={dayClosed ? "Reopen the day to prepare more food" : "Add Prepared Food"}
+            disabled={dayClosed}
             onClick={() => setPrepOpen(true)}
           >
             <span className="btn__label">Add Prepared Food</span>
@@ -277,7 +290,7 @@ export function POS() {
       {view === "sell" ? (
         <div className={`poslayout${isNarrow ? " poslayout--narrow" : ""}`}>
           <section className="stack">
-            <div className="toolbar">
+            <div className="toolbar toolbar--pills">
               <label className="search">
                 <Search className="ico" />
                 <input
@@ -383,15 +396,27 @@ export function POS() {
           </div>
           {transactions.length ? (
             <div className="tablewrap">
-              <table className="table table--compact">
+              <table className="table table--compact saleshis">
                 <thead>
                   <tr>
-                    <th scope="col">Receipt</th>
-                    <th scope="col">Date &amp; time</th>
-                    <th scope="col">Items</th>
+                    <th scope="col">
+                      <span className="lg">Receipt</span>
+                      <span className="sm">#ID</span>
+                    </th>
+                    <th scope="col">
+                      <span className="lg">Date &amp; time</span>
+                      <span className="sm">Date</span>
+                    </th>
+                    <th scope="col">
+                      <span className="lg">Items</span>
+                      <span className="sm">Qty</span>
+                    </th>
                     <th scope="col">Total</th>
-                    <th scope="col">Payment</th>
-                    <th scope="col">Status</th>
+                    <th scope="col" className="col-pay">Payment</th>
+                    <th scope="col">
+                      <span className="lg">Status</span>
+                      <span className="sm">St</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -401,7 +426,7 @@ export function POS() {
                       className="table__row"
                       tabIndex={0}
                       role="button"
-                      aria-label={`Open receipt ${txn.code}`}
+                      aria-label={`Open receipt ${txn.code} for ${manilaStamp(txn.at)}`}
                       onClick={() => setSelected(txn)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
@@ -410,12 +435,16 @@ export function POS() {
                         }
                       }}
                     >
-                      <td><b>{txn.code}</b></td>
-                      <td>{manilaStamp(txn.at)}</td>
-                      <td>{txn.items.reduce((s, l) => s + l.qty, 0)} serving(s)</td>
-                      <td>{peso(txn.total)}</td>
-                      <td>{txn.payment}</td>
+                      <td><b className="rcpt">{txn.code.replace(/^FW-/, "#")}</b></td>
                       <td>
+                        <span className="lg">{manilaStamp(txn.at)}</span>
+                        <span className="sm">{formatStamp(txn.at)}</span>
+                      </td>
+                      <td>{txn.items.reduce((s, l) => s + l.qty, 0)}<span className="lg"> serving(s)</span></td>
+                      <td>{peso(txn.total)}</td>
+                      <td className="col-pay">{txn.payment}</td>
+                      <td>
+                        <span className={`sdot sdot--${txn.status}`} title={txn.status} aria-hidden="true" />
                         <StatusPill tone={txn.status === "completed" ? "good" : txn.status === "voided" ? "danger" : "amber"}>
                           {txn.status}
                         </StatusPill>

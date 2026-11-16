@@ -1552,7 +1552,9 @@
 }
 
 .vision__center img {
-  width: 118px;
+  width: clamp(150px, 20vw, 212px);
+  height: auto;
+  filter: drop-shadow(0 12px 30px rgba(230, 197, 71, 0.35));
 }
 
 .orbit-dot {
@@ -1943,5 +1945,169 @@
 @media (max-width: 620px) {
   .hero__scroll {
     display: none;
+  }
+}
+
+
+/* =======================================================================
+   Hero platter — transparent drumettes inside the gold rings, with steam
+   ======================================================================= */
+
+.platter {
+  --platter-size: min(88%, 520px);
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.platter__rings,
+.platter__food {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}
+
+.platter__rings {
+  width: var(--platter-size);
+  height: var(--platter-size);
+}
+
+.platter__rings svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  filter: drop-shadow(0 0 26px rgba(230, 197, 71, 0.22));
+}
+
+.platter__dash {
+  transform-origin: 50% 50%;
+  animation: platter-spin 48s linear infinite;
+}
+
+.platter__glow {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: calc(var(--platter-size) * 0.9);
+  height: calc(var(--platter-size) * 0.9);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 46%,
+    rgba(230, 197, 71, 0.26),
+    rgba(230, 197, 71, 0.08) 45%,
+    transparent 70%
+  );
+  filter: blur(6px);
+}
+
+.platter__food {
+  width: calc(var(--platter-size) * 0.84);
+  aspect-ratio: 1000 / 717;
+  animation: platter-float 7.5s ease-in-out infinite;
+}
+
+.platter__chicken {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+  filter: drop-shadow(0 26px 34px rgba(0, 0, 0, 0.55))
+    drop-shadow(0 0 22px rgba(230, 197, 71, 0.28));
+}
+
+/* --- Steam ------------------------------------------------------------ */
+
+.platter__steam {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.platter__steam i {
+  position: absolute;
+  left: var(--x, 50%);
+  top: var(--y, 25%);
+  width: 15px;
+  height: 96px;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 253, 244, 0.55) 42%,
+    rgba(255, 250, 232, 0.22) 72%,
+    rgba(255, 250, 232, 0) 100%
+  );
+  filter: blur(7px);
+  opacity: 0;
+  transform: translate(-50%, 12px) scale(0.7, 0.5);
+  animation: steam-rise var(--dur, 5.5s) linear var(--delay, 0s) infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes steam-rise {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 12px) scale(0.7, 0.5);
+  }
+  16% {
+    opacity: 0.5;
+  }
+  55% {
+    opacity: 0.34;
+    transform: translate(calc(-50% + var(--drift, 8px)), -120px) scale(0.95, 1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% - var(--drift, 8px)), -250px) scale(1.3, 1.7);
+  }
+}
+
+@keyframes platter-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes platter-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Reduced motion: static composition, no steam, no drift. */
+@media (prefers-reduced-motion: reduce) {
+  .platter__steam {
+    display: none;
+  }
+
+  .platter__food,
+  .platter__dash {
+    animation: none;
+  }
+}
+
+@media (max-width: 1080px) {
+  .platter {
+    --platter-size: min(86%, 340px);
+  }
+}
+
+@media (max-width: 380px) {
+  .platter {
+    --platter-size: min(84%, 280px);
+  }
+
+  .platter__steam i {
+    height: 74px;
+    width: 12px;
   }
 }

@@ -11,9 +11,11 @@ import {
 } from "../src/lib/actions";
 import {
   availableServings,
+  closingDraft,
   forecastFor,
   kpis,
   periodRange,
+  preparedQty,
   reconciliationGap,
   stockState,
   wasteSummary,
@@ -177,7 +179,8 @@ check(
 
 /* ------------------------------------------------------- menu & inventory */
 
-const withProduct = upsertProduct(data, {
+const menuData = buildSeedData();
+const withProduct = upsertProduct(menuData, {
   name: "Test Dish",
   category: "Main Course",
   price: 199,
@@ -275,6 +278,60 @@ const levels = stockState(restocked);
 check(levels.out.length + levels.low.length + levels.normal.length === 29, "Stock status partitions every ingredient");
 check(convertQty(200, "g", "kg") === 0.2, "Unit conversion: 200 g to kg");
 check(convertQty(1, "kg", "pcs") === null, "Incompatible units are rejected");
+
+/* --------- B1: availability comes only from confirmed preparation -------- */
+
+let avail: AppData = buildSeedData();
+const affog = avail.products.find((p) => p.name === "Affogato") as { id: string };
+const affogSeed = [21, 16, 11, 18, 14];
+const recBefore = forecastFor(avail, affog.id).recommended;
+
+check(availableServings(avail, affog.id) === 0, "No dish has available servings before preparation");
+check(preparedQty(avail, affog.id, { from: today, to: today }) === 0, "No prepared stock is seeded for today");
+check(recBefore !== null && recBefore > 0, "A recommendation still exists without prepared stock");
+
+const prep15 = prepareServings(avail, { productId: affog.id, servings: 15 });
+check(prep15.ok, "Preparing 15 Affogato servings is accepted");
+if (prep15.ok) avail = prep15.data;
+check(availableServings(avail, affog.id) === 15, "Confirmed preparation makes 15 servings available");
+check(forecastFor(avail, affog.id).recommended === recBefore, "Preparation never changes the recommendation");
+
+const sell5 = checkout(avail, { cart: [{ productId: affog.id, qty: 5 }], payment: "GCash" });
+check(sell5.ok, "Selling five servings succeeds");
+if (sell5.ok) avail = sell5.data;
+check(availableServings(avail, affog.id) === 10, "A sale reduces availability to 10");
+const expectedAfterSale = Math.round((affogSeed[1] + affogSeed[2] + affogSeed[3] + affogSeed[4] + 5) / 5);
+check(forecastFor(avail, affog.id).recommended === expectedAfterSale, "A completed sale updates the rolling window");
+
+const wrap = closeOperatingDay(avail, today, closingDraft(avail, today));
+check(wrap.ok, "Wrap Up closes the day");
+if (wrap.ok) avail = wrap.data;
+check(availableServings(avail, affog.id) === 0, "Wrap Up clears the remaining availability");
+const affogLine = avail.closings.find((c) => c.date === today)?.lines.find((l) => l.productId === affog.id);
+check(affogLine?.discarded === 10, "Wrap Up records the remaining 10 servings as discarded");
+check(
+  forecastFor(avail, affog.id).recommended === expectedAfterSale,
+  "Wrap Up does not disturb the recommendation"
+);
+
+const stale = buildSeedData();
+check(availableServings(stale, affog.id) === 0, "Historical seeded batches never restore current availability");
+const allClosed: AppData = { ...stale, days: stale.days.map((d) => (d.date === today ? { ...d, status: "closed" } : d)) };
+check(availableServings(allClosed, affog.id) === 0, "Closed-day stock does not reappear after a refresh");
+
+/* ------------------- guarding preparation on a wrapped-up day ---------- */
+
+const closedDayData = buildSeedData();
+const closedWrap = closeOperatingDay(closedDayData, today, closingDraft(closedDayData, today));
+if (closedWrap.ok) {
+  const blocked = prepareMany(closedWrap.data, [{ productId: affog.id, servings: 5 }]);
+  check(!blocked.ok, "Preparation is refused once the day is wrapped up");
+  const stockBefore = closedWrap.data.ingredients.find((i) => i.id === "ing-icecream") as { stock: number };
+  check(
+    (closedWrap.data.ingredients.find((i) => i.id === "ing-icecream") as { stock: number }).stock === stockBefore.stock,
+    "A refused preparation deducts no ingredients"
+  );
+}
 
 console.log(failures ? `\n${failures} CHECK(S) FAILED` : "\nALL CHECKS PASSED");
 if (failures) process.exit(1);

@@ -1,18 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Archive,
   ArchiveRestore,
   Boxes,
   History,
   PackagePlus,
-  Pencil,
   Plus,
   Search,
-  SlidersHorizontal,
   TriangleAlert,
 } from "lucide-react";
-import { Badge, Button, Card, EmptyState, Field, IconButton, Segmented, StatusPill } from "../components/ui";
-import { DetailPanel, DetailRows, DetailSection } from "../components/DetailPanel";
+import { Button, Card, EmptyState, Field, IconButton, Segmented, StatusPill } from "../components/ui";
+import { DetailPanel, DetailSection, InfoTile } from "../components/DetailPanel";
 import { useStore } from "../data/store";
 import { useToast } from "../data/toast";
 import { INGREDIENT_CATEGORIES, UNITS, type Ingredient, type IngredientCategory, type Unit } from "../types";
@@ -29,6 +27,30 @@ const MOVEMENT_LABEL: Record<string, string> = {
   seed: "Opening stock",
 };
 
+const MOVEMENT_KINDS: Array<{ value: "restock" | "adjust" | "loss"; label: string }> = [
+  { value: "restock", label: "Add stock (delivery)" },
+  { value: "adjust", label: "Correct stock (signed)" },
+  { value: "loss", label: "Record ingredient loss" },
+];
+
+interface Draft {
+  id: string;
+  name: string;
+  category: IngredientCategory;
+  unit: Unit;
+  lowThreshold: number;
+}
+
+function draftFrom(ingredient: Ingredient | null): Draft {
+  return {
+    id: ingredient?.id ?? "",
+    name: ingredient?.name ?? "",
+    category: ingredient?.category ?? "Dry Goods",
+    unit: ingredient?.unit ?? "kg",
+    lowThreshold: ingredient?.lowThreshold ?? 1,
+  };
+}
+
 export function Inventory() {
   const { data, saveIngredient, setIngredientStatus, moveStock } = useStore();
   const { push } = useToast();
@@ -36,9 +58,9 @@ export function Inventory() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<IngredientCategory | "all">("all");
   const [showArchived, setShowArchived] = useState(false);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [mode, setMode] = useState<"view" | "edit" | "stock">("view");
-  const [draft, setDraft] = useState<Ingredient | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [adding, setAdding] = useState(false);
 
   const stock = useMemo(() => stockState(data), [data]);
 
@@ -54,33 +76,28 @@ export function Inventory() {
     });
   }, [data.ingredients, category, query, showArchived]);
 
-  const current = selected ? data.ingredients.find((i) => i.id === selected) ?? null : null;
+  const current = openId ? data.ingredients.find((i) => i.id === openId) ?? null : null;
   const movements = current
-    ? data.movements.filter((m) => m.ingredientId === current.id).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    ? data.movements
+        .filter((m) => m.ingredientId === current.id)
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
     : [];
   const usedIn = current ? data.recipes.filter((r) => r.ingredientId === current.id).length : 0;
 
-  function openIngredient(id: string, next: "view" | "edit" | "stock" = "view") {
-    const ingredient = data.ingredients.find((i) => i.id === id) ?? null;
-    setSelected(id);
-    setDraft(ingredient);
-    setMode(next);
+  // Keep the edit form in step with the record (stock changes etc.).
+  useEffect(() => {
+    if (current) setDraft(draftFrom(current));
+  }, [current?.id, current?.updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function openIngredient(id: string) {
+    setAdding(false);
+    setOpenId(id);
   }
 
   function startNew() {
-    setSelected(null);
-    setDraft({
-      id: "",
-      name: "",
-      category: "Dry Goods",
-      unit: "kg",
-      stock: 0,
-      lowThreshold: 1,
-      status: "active",
-      createdAt: "",
-      updatedAt: "",
-    });
-    setMode("edit");
+    setOpenId(null);
+    setAdding(true);
+    setDraft(draftFrom(null));
   }
 
   function saveDraft() {
@@ -99,21 +116,24 @@ export function Inventory() {
       draft.id || undefined
     );
     push(draft.id ? "Ingredient updated." : "Ingredient added.", "good");
-    setMode("view");
-    if (!draft.id) setSelected(null);
+    if (!draft.id) {
+      setAdding(false);
+      setDraft(null);
+    }
   }
 
-  function applyStock(kind: "restock" | "adjust" | "loss", qty: number, note: string) {
+  function applyMovement(kind: "restock" | "adjust" | "loss", qty: number, note: string) {
     if (!current) return;
     const delta = kind === "adjust" ? qty : kind === "restock" ? Math.abs(qty) : -Math.abs(qty);
     moveStock(current.id, kind, delta, note || MOVEMENT_LABEL[kind]);
     push(`${MOVEMENT_LABEL[kind]} recorded for ${current.name}.`, "good");
-    setMode("view");
   }
+
+  const firstCritical = rows.find((r) => stockLevel(r) !== "normal") ?? rows[0];
 
   return (
     <div className="stack">
-      <header className="head">
+      <header className="head head--intro">
         <div className="head__lead">
           <h1 className="head__title">Inventory</h1>
           <p className="head__sub">Raw ingredients consumed by confirmed food preparation.</p>
@@ -125,11 +145,8 @@ export function Inventory() {
           <Button
             variant="soft"
             icon={<PackagePlus className="ico" />}
-            disabled={!rows.length}
-            onClick={() => {
-              const first = rows.find((r) => stockLevel(r) !== "normal") ?? rows[0];
-              if (first) openIngredient(first.id, "stock");
-            }}
+            disabled={!firstCritical}
+            onClick={() => firstCritical && openIngredient(firstCritical.id)}
           >
             Add Stock
           </Button>
@@ -169,27 +186,40 @@ export function Inventory() {
           />
         }
       >
-        <div className="toolbar">
+        <div className="toolbar toolbar--row">
           <label className="search">
             <Search className="ico" />
-            <input placeholder="Search ingredients" aria-label="Search ingredients" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input
+              placeholder="Search ingredients"
+              aria-label="Search ingredients"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
           </label>
-          <div className="pillrow" role="group" aria-label="Filter by category">
-            <button type="button" className={`filter-pill${category === "all" ? " is-on" : ""}`} aria-pressed={category === "all"} onClick={() => setCategory("all")}>All</button>
+          <select
+            className="input catselect"
+            aria-label="Filter by category"
+            value={category}
+            onChange={(e) => setCategory(e.target.value as IngredientCategory | "all")}
+          >
+            <option value="all">All categories</option>
             {INGREDIENT_CATEGORIES.map((c) => (
-              <button key={c} type="button" className={`filter-pill${category === c ? " is-on" : ""}`} aria-pressed={category === c} onClick={() => setCategory(c)}>{c}</button>
+              <option key={c} value={c}>{c}</option>
             ))}
-          </div>
+          </select>
         </div>
 
         {rows.length ? (
           <div className="tablewrap">
-            <table className="table">
+            <table className="table invtable">
               <thead>
                 <tr>
                   <th scope="col">Ingredient</th>
                   <th scope="col" className="col-cat">Category</th>
-                  <th scope="col">Available</th>
+                  <th scope="col">
+                    <span className="lg">Available</span>
+                    <span className="sm">In Stock</span>
+                  </th>
                   <th scope="col" className="col-status">Status</th>
                   <th scope="col">Actions</th>
                 </tr>
@@ -203,7 +233,7 @@ export function Inventory() {
                       className={`table__row row--${level}`}
                       tabIndex={0}
                       role="button"
-                      aria-label={`Open ${ingredient.name}`}
+                      aria-label={`Open ${ingredient.name} details`}
                       onClick={() => openIngredient(ingredient.id)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
@@ -231,9 +261,6 @@ export function Inventory() {
                       </td>
                       <td>
                         <span className="rowactions" onClick={(e) => e.stopPropagation()}>
-                          <IconButton label={`Edit ${ingredient.name}`} ghost size="sm" onClick={() => openIngredient(ingredient.id, "edit")}>
-                            <Pencil className="ico" />
-                          </IconButton>
                           <IconButton
                             label={ingredient.status === "active" ? `Archive ${ingredient.name}` : `Restore ${ingredient.name}`}
                             ghost
@@ -258,37 +285,91 @@ export function Inventory() {
         )}
       </Card>
 
-      {/* Ingredient details / editor / stock */}
+      {/* Editable ingredient details — opened by clicking a row */}
       <DetailPanel
-        open={mode === "view" && Boolean(current)}
-        onClose={() => setSelected(null)}
+        open={Boolean(current) && !adding}
+        onClose={() => setOpenId(null)}
         eyebrow="Ingredient"
         title={current?.name ?? ""}
-        subtitle={current ? `${current.category} · ${qtyLabel(current.stock)} ${current.unit} available` : ""}
+        subtitle={current ? `${current.category} · ${qtyLabel(current.stock)} ${current.unit} on hand` : ""}
         footer={
           <div className="dpanel__actions">
-            <Button variant="ghost" icon={<Pencil className="ico" />} onClick={() => setMode("edit")}>Edit</Button>
-            <Button variant="soft" icon={<SlidersHorizontal className="ico" />} onClick={() => setMode("stock")}>Stock adjustment</Button>
+            <Button
+              variant={current?.status === "archived" ? "soft" : "ghost"}
+              icon={current?.status === "archived" ? <ArchiveRestore className="ico" /> : <Archive className="ico" />}
+              onClick={() => {
+                if (!current) return;
+                setIngredientStatus(current.id, current.status === "active" ? "archived" : "active");
+                push(current.status === "active" ? "Ingredient archived." : "Ingredient restored.", "good");
+              }}
+            >
+              {current?.status === "archived" ? "Restore" : "Archive"}
+            </Button>
+            <Button onClick={saveDraft}>Save Changes</Button>
           </div>
         }
       >
-        {current ? (
+        {current && draft ? (
           <>
-            <DetailRows
-              rows={[
-                { label: "Category", value: current.category },
-                { label: "Unit", value: current.unit },
-                { label: "Available", value: `${qtyLabel(current.stock)} ${current.unit}` },
-                { label: "Low-stock threshold", value: `${qtyLabel(current.lowThreshold)} ${current.unit}` },
-                { label: "Status", value: <StatusPill tone={stockLevel(current) === "out" ? "danger" : stockLevel(current) === "low" ? "amber" : "good"}>{stockLevel(current) === "normal" ? "In stock" : stockLevel(current) === "low" ? "Low stock" : "Out of stock"}</StatusPill> },
-                { label: "Used in", value: usedIn ? <Badge tone="sage">{usedIn} recipe line(s)</Badge> : "Not used yet" },
-              ]}
-            />
+            <div className="infogrid">
+              <InfoTile label="Available" value={`${qtyLabel(current.stock)} ${current.unit}`} />
+              <InfoTile label="Low threshold" value={`${qtyLabel(current.lowThreshold)} ${current.unit}`} />
+              <InfoTile label="Unit" value={current.unit} />
+              <InfoTile label="Used in" value={usedIn ? `${usedIn} recipe(s)` : "—"} />
+            </div>
+
+            <StockAdjuster ingredient={current} onApply={applyMovement} />
+
+            <DetailSection title="Details">
+              <Field label="Ingredient name" htmlFor="ing-name">
+                <input
+                  id="ing-name"
+                  className="input"
+                  value={draft.name}
+                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                />
+              </Field>
+              <div className="fieldrow">
+                <Field label="Category" htmlFor="ing-cat">
+                  <select
+                    id="ing-cat"
+                    className="input"
+                    value={draft.category}
+                    onChange={(e) => setDraft({ ...draft, category: e.target.value as IngredientCategory })}
+                  >
+                    {INGREDIENT_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Unit" htmlFor="ing-unit">
+                  <select
+                    id="ing-unit"
+                    className="input"
+                    value={draft.unit}
+                    onChange={(e) => setDraft({ ...draft, unit: e.target.value as Unit })}
+                  >
+                    {UNITS.map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+              <Field label="Low-stock threshold" htmlFor="ing-low" hint="Never shown on the Dashboard.">
+                <input
+                  id="ing-low"
+                  className="input"
+                  inputMode="decimal"
+                  value={String(draft.lowThreshold)}
+                  onChange={(e) => setDraft({ ...draft, lowThreshold: parseNumberInput(e.target.value) ?? 0 })}
+                />
+              </Field>
+            </DetailSection>
 
             <DetailSection title="Stock movements">
               {movements.length ? (
                 <ul className="movelist">
-                  {movements.slice(0, 12).map((m) => (
+                  {movements.slice(0, 10).map((m) => (
                     <li key={m.id}>
                       <span className={`movelist__dot movelist__dot--${m.qty < 0 ? "out" : "in"}`} />
                       <span className="movelist__body">
@@ -316,136 +397,141 @@ export function Inventory() {
         ) : null}
       </DetailPanel>
 
-      <EditIngredientPanel
-        open={mode === "edit"}
-        draft={draft}
-        onChange={setDraft}
-        onClose={() => (draft?.id ? setMode("view") : setSelected(null))}
-        onSave={saveDraft}
-      />
-
-      <StockPanel
-        open={mode === "stock" && Boolean(current)}
-        ingredient={current}
-        onClose={() => setMode("view")}
-        onApply={applyStock}
-      />
+      {/* New ingredient */}
+      <DetailPanel
+        open={adding}
+        onClose={() => {
+          setAdding(false);
+          setDraft(null);
+        }}
+        eyebrow="New"
+        title="Add Ingredient"
+        footer={
+          <div className="dpanel__actions">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setAdding(false);
+                setDraft(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={saveDraft}>Save Ingredient</Button>
+          </div>
+        }
+      >
+        {adding && draft ? (
+          <>
+            <Field label="Ingredient name" htmlFor="new-ing-name">
+              <input
+                id="new-ing-name"
+                className="input"
+                value={draft.name}
+                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              />
+            </Field>
+            <div className="fieldrow">
+              <Field label="Category" htmlFor="new-ing-cat">
+                <select
+                  id="new-ing-cat"
+                  className="input"
+                  value={draft.category}
+                  onChange={(e) => setDraft({ ...draft, category: e.target.value as IngredientCategory })}
+                >
+                  {INGREDIENT_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Unit" htmlFor="new-ing-unit">
+                <select
+                  id="new-ing-unit"
+                  className="input"
+                  value={draft.unit}
+                  onChange={(e) => setDraft({ ...draft, unit: e.target.value as Unit })}
+                >
+                  {UNITS.map((u) => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <Field label="Low-stock threshold" htmlFor="new-ing-low">
+              <input
+                id="new-ing-low"
+                className="input"
+                inputMode="decimal"
+                value={String(draft.lowThreshold)}
+                onChange={(e) => setDraft({ ...draft, lowThreshold: parseNumberInput(e.target.value) ?? 0 })}
+              />
+            </Field>
+            <p className="note">Opening stock is added afterwards with a stock adjustment so every movement stays auditable.</p>
+          </>
+        ) : null}
+      </DetailPanel>
     </div>
   );
 }
 
-function EditIngredientPanel({
-  open,
-  draft,
-  onChange,
-  onClose,
-  onSave,
-}: {
-  open: boolean;
-  draft: Ingredient | null;
-  onChange: (next: Ingredient) => void;
-  onClose: () => void;
-  onSave: () => void;
-}) {
-  if (!draft) return null;
-  return (
-    <DetailPanel
-      open={open}
-      onClose={onClose}
-      eyebrow={draft.id ? "Edit" : "New"}
-      title={draft.id ? draft.name : "Add Ingredient"}
-      footer={
-        <div className="dpanel__actions">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={onSave}>Save Changes</Button>
-        </div>
-      }
-    >
-      <Field label="Ingredient name" htmlFor="ing-name">
-        <input id="ing-name" className="input" value={draft.name} onChange={(e) => onChange({ ...draft, name: e.target.value })} />
-      </Field>
-      <Field label="Category" htmlFor="ing-cat">
-        <select id="ing-cat" className="input" value={draft.category} onChange={(e) => onChange({ ...draft, category: e.target.value as IngredientCategory })}>
-          {INGREDIENT_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </Field>
-      <Field label="Measurement unit" htmlFor="ing-unit">
-        <select id="ing-unit" className="input" value={draft.unit} onChange={(e) => onChange({ ...draft, unit: e.target.value as Unit })}>
-          {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-        </select>
-      </Field>
-      <Field label="Low-stock threshold" htmlFor="ing-low" hint="Never shown on the Dashboard.">
-        <input
-          id="ing-low"
-          className="input"
-          inputMode="decimal"
-          value={String(draft.lowThreshold)}
-          onChange={(e) => onChange({ ...draft, lowThreshold: parseNumberInput(e.target.value) ?? 0 })}
-        />
-      </Field>
-      <p className="note">Quantities are changed through stock adjustments so every movement stays auditable.</p>
-    </DetailPanel>
-  );
-}
-
-function StockPanel({
-  open,
+/** Inline stock movement form shown inside the ingredient panel. */
+function StockAdjuster({
   ingredient,
-  onClose,
   onApply,
 }: {
-  open: boolean;
-  ingredient: Ingredient | null;
-  onClose: () => void;
+  ingredient: Ingredient;
   onApply: (kind: "restock" | "adjust" | "loss", qty: number, note: string) => void;
 }) {
   const [kind, setKind] = useState<"restock" | "adjust" | "loss">("restock");
   const [qty, setQty] = useState("");
   const [note, setNote] = useState("");
 
-  if (!ingredient) return null;
   const value = parseNumberInput(qty) ?? 0;
   const preview = kind === "adjust" ? value : kind === "restock" ? Math.abs(value) : -Math.abs(value);
 
   return (
-    <DetailPanel
-      open={open}
-      onClose={onClose}
-      eyebrow="Inventory"
-      title="Stock Adjustment"
-      subtitle={`${ingredient.name} · ${qtyLabel(ingredient.stock)} ${ingredient.unit} on hand`}
-      footer={
-        <div className="dpanel__actions">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button
-            onClick={() => {
-              onApply(kind, value, note);
-              setQty("");
-              setNote("");
-            }}
-            disabled={value === 0}
-          >
-            Apply Movement
-          </Button>
-        </div>
-      }
-    >
-      <Field label="Movement type" htmlFor="mv-kind">
-        <select id="mv-kind" className="input" value={kind} onChange={(e) => setKind(e.target.value as typeof kind)}>
-          <option value="restock">Add stock (delivery)</option>
-          <option value="adjust">Correct stock (signed)</option>
-          <option value="loss">Record ingredient loss</option>
+    <DetailSection title="Stock adjustment">
+      <div className="stockrow">
+        <select
+          className="input"
+          aria-label="Movement type"
+          value={kind}
+          onChange={(e) => setKind(e.target.value as typeof kind)}
+        >
+          {MOVEMENT_KINDS.map((k) => (
+            <option key={k.value} value={k.value}>{k.label}</option>
+          ))}
         </select>
-      </Field>
-      <Field label={`Quantity (${ingredient.unit})`} htmlFor="mv-qty">
-        <input id="mv-qty" className="input" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="0" />
-      </Field>
-      <Field label="Note" htmlFor="mv-note">
-        <input id="mv-note" className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional reference" />
-      </Field>
+        <input
+          className="input input--num"
+          inputMode="decimal"
+          aria-label={`Quantity in ${ingredient.unit}`}
+          placeholder={ingredient.unit}
+          value={qty}
+          onChange={(e) => setQty(e.target.value)}
+        />
+        <Button
+          onClick={() => {
+            onApply(kind, value, note);
+            setQty("");
+            setNote("");
+          }}
+          disabled={value === 0}
+        >
+          Apply
+        </Button>
+      </div>
+      <input
+        className="input"
+        aria-label="Movement note"
+        placeholder="Optional reference"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+      />
       <p className="note">
-        <History className="ico" /> Resulting balance: <b>{qtyLabel(Math.max(0, ingredient.stock + preview))} {ingredient.unit}</b>
+        <History className="ico" /> Resulting balance:{" "}
+        <b>{qtyLabel(Math.max(0, ingredient.stock + preview))} {ingredient.unit}</b>
       </p>
-    </DetailPanel>
+    </DetailSection>
   );
 }

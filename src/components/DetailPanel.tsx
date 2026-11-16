@@ -88,3 +88,32 @@ export function DetailSection({
     </section>
   );
 }
+
+/** Compact labelled figure used in the panels' information grids. */
+export function InfoTile({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="info">
+      <b>{value}</b>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+/** Premium gold callout for a headline figure (e.g. recommended servings). */
+export function GoldCallout({
+  label,
+  value,
+  basis,
+}: {
+  label: string;
+  value: ReactNode;
+  basis?: ReactNode;
+}) {
+  return (
+    <section className="goldcard">
+      <span className="goldcard__label">{label}</span>
+      <b className="goldcard__value">{value}</b>
+      {basis ? <span className="goldcard__basis">{basis}</span> : null}
+    </section>
+  );
+}

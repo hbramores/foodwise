@@ -82,6 +82,13 @@ export function prepareMany(
     return { ok: false, error: "Enter a prepared quantity for at least one dish.", blockers: [] };
   }
 
+  // A wrapped-up day holds no sellable servings, so confirming a batch there
+  // would deduct ingredients for food that could never be sold.
+  const existingDay = data.days.find((d) => d.date === date);
+  if (existingDay?.status === "closed") {
+    return { ok: false, error: "Today is already wrapped up — reopen the day before preparing more food.", blockers: [] };
+  }
+
   const products = new Map<string, MenuProduct>();
   for (const entry of clean) {
     const product = data.products.find((p) => p.id === entry.productId);

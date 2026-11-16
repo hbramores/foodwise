@@ -125,6 +125,20 @@ export function manilaTime(iso: string): string {
   return MANILA_CLOCK.format(new Date(iso));
 }
 
+const MANILA_STAMP_PARTS = new Intl.DateTimeFormat("en-US", {
+  timeZone: MANILA_TZ,
+  year: "2-digit",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/** Compact date stamp, e.g. "11/17/26", in Asia/Manila. */
+export function formatStamp(iso: string): string {
+  const parts = MANILA_STAMP_PARTS.formatToParts(new Date(iso));
+  const pick = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${pick("month")}/${pick("day")}/${pick("year")}`;
+}
+
 /** Monday of the week containing `iso`. */
 export function weekStartISO(iso: string): string {
   const d = fromISODate(iso);

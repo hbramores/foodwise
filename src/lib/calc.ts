@@ -98,22 +98,27 @@ export function discardedQty(data: AppData, productId: string, range: PeriodRang
   return total;
 }
 
-/** Carry-over that has not been sold or discarded yet — still sellable. */
-export function availableServings(data: AppData, productId: string): number {
+/**
+ * Servings that can actually be sold right now.
+ *
+ * Only the current operating day counts. A forecast recommendation never
+ * creates stock, nothing is sellable until a preparation batch is confirmed,
+ * and a wrapped-up day has nothing left. Keeping the scope to one day also
+ * means closed-day quantities can never leak back in from stale stored data.
+ */
+export function availableServings(
+  data: AppData,
+  productId: string,
+  date = manilaToday()
+): number {
+  const day = data.days.find((d) => d.date === date);
+  if (day?.status === "closed") return 0;
+
   const prepared = data.batches
-    .filter((b) => b.productId === productId)
+    .filter((b) => b.productId === productId && b.date === date)
     .reduce((sum, b) => sum + b.servings, 0);
-  let sold = 0;
-  for (const txn of data.transactions) {
-    if (txn.status !== "completed") continue;
-    for (const line of txn.items) if (line.productId === productId) sold += line.qty;
-  }
-  let discarded = 0;
-  for (const closing of data.closings) {
-    for (const line of closing.lines) {
-      if (line.productId === productId) discarded += line.discarded;
-    }
-  }
+  const sold = soldQtyOn(data, productId, date);
+  const discarded = discardedQty(data, productId, { from: date, to: date });
   return Math.max(0, prepared - sold - discarded);
 }
 

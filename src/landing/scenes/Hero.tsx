@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef, type CSSProperties } from "react";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { gsap } from "../gsap";
 import { useMagnetic, usePrefersReducedMotion, useVisibility } from "../hooks";
+import { HeroPlatter } from "./HeroPlatter";
 
 const HeroScene3D = lazy(() => import("../three/HeroScene3D"));
 
@@ -58,6 +59,7 @@ export function Hero({ ready, onEnterDemo }: { ready: boolean; onEnterDemo: () =
         ) : (
           <div className="hero__fallback" />
         )}
+        <HeroPlatter />
       </div>
 
       <div className="hero__scrim" aria-hidden="true" />

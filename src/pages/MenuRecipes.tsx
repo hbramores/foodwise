@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { Badge, Button, Card, EmptyState, Field, IconButton, Segmented, StatusPill } from "../components/ui";
-import { DetailPanel, DetailRows, DetailSection } from "../components/DetailPanel";
+import { DetailPanel, DetailSection, InfoTile } from "../components/DetailPanel";
 import { useStore } from "../data/store";
 import { useToast } from "../data/toast";
 import { MENU_CATEGORIES, UNITS, type MenuCategory, type MenuProduct, type Unit } from "../types";
@@ -132,7 +132,7 @@ export function MenuRecipes() {
 
   return (
     <div className="stack">
-      <header className="head">
+      <header className="head head--intro">
         <div className="head__lead">
           <h1 className="head__title">Menu &amp; Recipes</h1>
           <p className="head__sub">Dishes, selling prices and the recipe that drives preparation.</p>
@@ -159,17 +159,27 @@ export function MenuRecipes() {
           />
         }
       >
-        <div className="toolbar">
+        <div className="toolbar toolbar--row">
           <label className="search">
             <Search className="ico" />
-            <input placeholder="Search dishes" aria-label="Search dishes" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input
+              placeholder="Search menu"
+              aria-label="Search menu"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
           </label>
-          <div className="pillrow" role="group" aria-label="Filter by category">
-            <button type="button" className={`filter-pill${category === "all" ? " is-on" : ""}`} aria-pressed={category === "all"} onClick={() => setCategory("all")}>All</button>
+          <select
+            className="input catselect"
+            aria-label="Filter by category"
+            value={category}
+            onChange={(e) => setCategory(e.target.value as MenuCategory | "all")}
+          >
+            <option value="all">All categories</option>
             {MENU_CATEGORIES.map((c) => (
-              <button key={c} type="button" className={`filter-pill${category === c ? " is-on" : ""}`} aria-pressed={category === c} onClick={() => setCategory(c)}>{c}</button>
+              <option key={c} value={c}>{c}</option>
             ))}
-          </div>
+          </select>
         </div>
 
         {rows.length ? (
@@ -232,15 +242,14 @@ export function MenuRecipes() {
       >
         {current ? (
           <>
+            <div className="pdpm" >
+              <span className="pdpm__cat">{current.category}</span>
+              <StatusPill tone={current.status === "active" ? "good" : "plain"}>
+                {current.status === "active" ? "Active" : "Archived"}
+              </StatusPill>
+              <b className="pdpm__price">{peso(current.price)}</b>
+            </div>
             <p className="dpanel__desc">{current.description || "No description yet."}</p>
-            <DetailRows
-              rows={[
-                { label: "Category", value: current.category },
-                { label: "Selling price", value: peso(current.price) },
-                { label: "Status", value: <StatusPill tone={current.status === "active" ? "good" : "plain"}>{current.status}</StatusPill> },
-                { label: "Recommended", value: forecastFor(data, current.id).recommended === null ? "Insufficient data" : `${num(forecastFor(data, current.id).recommended as number)} servings` },
-              ]}
-            />
             <DetailSection title="Recipe">
               {data.recipes.filter((r) => r.productId === current.id).length ? (
                 <ul className="lines">
@@ -259,6 +268,25 @@ export function MenuRecipes() {
               ) : (
                 <p className="note">No recipe yet — preparation cannot be confirmed until ingredients are added.</p>
               )}
+            </DetailSection>
+
+            <DetailSection title="Product information">
+              <div className="infogrid">
+                <InfoTile label="Category" value={current.category} />
+                <InfoTile label="Selling price" value={peso(current.price)} />
+                <InfoTile
+                  label="Recipe lines"
+                  value={data.recipes.filter((r) => r.productId === current.id).length}
+                />
+                <InfoTile
+                  label="Recommended"
+                  value={
+                    forecastFor(data, current.id).recommended === null
+                      ? "—"
+                      : num(forecastFor(data, current.id).recommended as number)
+                  }
+                />
+              </div>
             </DetailSection>
           </>
         ) : null}

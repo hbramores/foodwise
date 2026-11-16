@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Calculator, ChefHat, Info, TrendingUp } from "lucide-react";
 import { Badge, Button, Card, EmptyState, Segmented } from "../components/ui";
-import { DetailPanel, DetailRows, DetailSection } from "../components/DetailPanel";
+import { DetailPanel, DetailSection, GoldCallout, InfoTile } from "../components/DetailPanel";
 import { useStore } from "../data/store";
 import { FORECAST_WINDOW, type MenuProduct } from "../types";
 import { productImage, productInitial } from "../lib/images";
@@ -35,7 +35,7 @@ export function Forecasting() {
 
   return (
     <div className="stack">
-      <header className="head">
+      <header className="head head--intro">
         <div className="head__lead">
           <h1 className="head__title">Forecasting</h1>
           <p className="head__sub">
@@ -133,14 +133,26 @@ export function Forecasting() {
 
       <Card title="Preparation comparison" icon={<ChefHat className="ico" />} sub="Recommended against what is already available today">
         <div className="tablewrap">
-          <table className="table table--compact">
+          <table className="table table--compact forecast-table">
             <thead>
               <tr>
                 <th scope="col">Dish</th>
-                <th scope="col">Recommended</th>
-                <th scope="col">Available now</th>
-                <th scope="col">Prepared (window)</th>
-                <th scope="col">Sold (window)</th>
+                <th scope="col">
+                  <span className="lg">Recommended</span>
+                  <span className="sm">Advised</span>
+                </th>
+                <th scope="col">
+                  <span className="lg">Available now</span>
+                  <span className="sm">In Stock</span>
+                </th>
+                <th scope="col">
+                  <span className="lg">Prepared (window)</span>
+                  <span className="sm">Prepped</span>
+                </th>
+                <th scope="col">
+                  <span className="lg">Sold (window)</span>
+                  <span className="sm">Sold</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -168,6 +180,10 @@ function ForecastDetails({ product, onClose }: { product: MenuProduct | null; on
   const { data } = useStore();
   const today = manilaToday();
   const f = product ? forecastFor(data, product.id) : null;
+  const from = f?.dates[0] ?? today;
+  const prepared = product ? preparedQty(data, product.id, { from, to: today }) : 0;
+  const sold = product ? soldQty(data, product.id, { from, to: today }) : 0;
+  const peak = f && f.values.length ? Math.max(1, ...f.values) : 1;
 
   return (
     <DetailPanel
@@ -175,36 +191,44 @@ function ForecastDetails({ product, onClose }: { product: MenuProduct | null; on
       onClose={onClose}
       eyebrow="Forecast"
       title={product?.name ?? ""}
-      subtitle={product ? `${product.category} · ${peso(product.price)}` : ""}
-      media={product && productImage(product) ? <img className="dpanel__img" src={productImage(product) as string} alt={product.name} /> : null}
+      subtitle={product ? `${product.category} — ${peso(product.price)}` : ""}
+      media={
+        product && productImage(product) ? (
+          <img className="dpanel__img" src={productImage(product) as string} alt={product.name} />
+        ) : null
+      }
       footer={
         <div className="dpanel__actions">
+          <span className="dpanel__total">
+            {f?.validDays ? `${f.validDays} of ${FORECAST_WINDOW} recorded days` : "No recorded days yet"}
+          </span>
           <Button variant="ghost" onClick={onClose}>Close</Button>
         </div>
       }
     >
       {f ? (
         <>
-          <section className="reccallout">
-            <span>Recommended servings</span>
-            <b>{f.recommended === null ? "—" : num(f.recommended)}</b>
-            <small>
-              {f.validDays
-                ? `${num(f.total)} sales ÷ ${f.validDays} recorded day(s)`
-                : "Insufficient data — record at least one operating day"}
-            </small>
-          </section>
+          <GoldCallout
+            label="Recommended servings"
+            value={f.recommended === null ? "—" : num(f.recommended)}
+            basis={
+              f.validDays
+                ? `Based on ${num(f.total)} sales across ${f.validDays} recorded day${f.validDays === 1 ? "" : "s"}.`
+                : "Record at least one operating day to forecast this dish."
+            }
+          />
 
-          <DetailSection title="Recent recorded days">
+          <DetailSection title="Recent sales">
             {f.dates.length ? (
-              <ul className="lines">
+              <div className="sparkbars">
                 {f.dates.map((date, i) => (
-                  <li key={date}>
-                    <span>{formatCompact(date)}</span>
-                    <b>{num(f.values[i])} sold</b>
-                  </li>
+                  <span className="sparkbars__col" key={date}>
+                    <i style={{ height: `${Math.max(6, Math.round((f.values[i] / peak) * 100))}%` }} />
+                    <b>{num(f.values[i])}</b>
+                    <small>{formatCompact(date)}</small>
+                  </span>
                 ))}
-              </ul>
+              </div>
             ) : (
               <p className="note">No recorded sales yet for this dish.</p>
             )}
@@ -214,25 +238,30 @@ function ForecastDetails({ product, onClose }: { product: MenuProduct | null; on
             <div className="mathline">
               {f.values.length ? (
                 <>
-                  <span>{f.values.join(" + ")} = {num(f.total)}</span>
-                  <span className="muted">÷ {f.validDays} day(s)</span>
-                  <span>= {f.average === null ? "—" : f.average.toFixed(2)}</span>
-                  <span>→ ROUND = <b>{f.recommended === null ? "—" : num(f.recommended)}</b></span>
+                  <span>{f.values.join(" + ")}</span>
+                  <span className="op">=</span>
+                  <span>{num(f.total)}</span>
+                  <span className="op">÷</span>
+                  <span>{f.validDays}d</span>
+                  <span className="op">=</span>
+                  <span>{f.average === null ? "—" : f.average.toFixed(2)}</span>
+                  <span className="op">→</span>
+                  <b>{f.recommended === null ? "—" : num(f.recommended)}</b>
                 </>
               ) : (
-                <span className="muted">Insufficient data</span>
+                <span className="muted">Insufficient data — no completed sales recorded.</span>
               )}
             </div>
           </DetailSection>
 
-          <DetailRows
-            rows={[
-              { label: "Available now", value: num(availableServings(data, product?.id ?? "")) },
-              { label: "Prepared in window", value: num(preparedQty(data, product?.id ?? "", { from: f.dates[0] ?? today, to: today })) },
-              { label: "Sold in window", value: num(soldQty(data, product?.id ?? "", { from: f.dates[0] ?? today, to: today })) },
-              { label: "Recorded days", value: `${f.validDays} of ${FORECAST_WINDOW}` },
-            ]}
-          />
+          <DetailSection title="Preparation comparison">
+            <div className="infogrid">
+              <InfoTile label="Available now" value={num(availableServings(data, product?.id ?? ""))} />
+              <InfoTile label="Prepared in window" value={num(prepared)} />
+              <InfoTile label="Sold in window" value={num(sold)} />
+              <InfoTile label="Recorded days" value={`${f.validDays}/${FORECAST_WINDOW}`} />
+            </div>
+          </DetailSection>
         </>
       ) : null}
     </DetailPanel>
