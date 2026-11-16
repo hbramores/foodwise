@@ -3,6 +3,7 @@ import {
   ClipboardList,
   History as HistoryIcon,
   LayoutGrid,
+  LogOut,
   PanelLeft,
   PanelLeftClose,
   PanelLeftOpen,
@@ -69,12 +70,14 @@ function Sidebar({
   navigate,
   collapsed,
   onToggleCollapse,
+  onLogout,
   onNavigate,
 }: {
   route: RouteKey;
   navigate: (r: RouteKey) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  onLogout: () => void;
   onNavigate?: () => void;
 }) {
   const { data } = useData();
@@ -86,10 +89,10 @@ function Sidebar({
       <div className="side__top">
         <span className="brand">
           <span className="brand__mark">
-            <BrandMark size={22} />
+            <BrandMark size={30} />
           </span>
           <span className="brand__name">
-            FoodWise PH
+            FoodWise
             <small>Sales to servings</small>
           </span>
         </span>
@@ -132,6 +135,17 @@ function Sidebar({
           );
         })}
       </nav>
+
+      <button
+        type="button"
+        className="side__logout"
+        aria-label="Log out"
+        title="Log out"
+        onClick={onLogout}
+      >
+        <LogOut className="ico" aria-hidden="true" />
+        <span className="nav__label">Log out</span>
+      </button>
 
       <div className="side__foot">
         <b>{data.restaurant?.name ?? "Your restaurant"}</b>
@@ -187,12 +201,14 @@ export function AppShell({
   navigate,
   sideOpen,
   setSideOpen,
+  onLogout,
   children,
 }: {
   route: RouteKey;
   navigate: (r: RouteKey) => void;
   sideOpen: boolean;
   setSideOpen: (v: boolean) => void;
+  onLogout: () => void;
   children: ReactNode;
 }) {
   const { data } = useData();
@@ -208,6 +224,7 @@ export function AppShell({
         navigate={navigate}
         collapsed={collapsed}
         onToggleCollapse={() => setCollapsed((v) => !v)}
+        onLogout={onLogout}
         onNavigate={() => setSideOpen(false)}
       />
 
@@ -228,9 +245,9 @@ export function AppShell({
 
           <span className="top__brand">
             <span className="top__brand-mark">
-              <BrandMark size={19} />
+              <BrandMark size={26} />
             </span>
-            <b>FoodWise PH</b>
+            <b>FoodWise</b>
           </span>
 
           <div className="top__crumb">

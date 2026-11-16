@@ -111,6 +111,9 @@ export function useCountUp(target: number, active: boolean, duration = 1400, red
   return value;
 }
 
+/** Session key for the cinematic intro so it never replays in a session. */
+export const INTRO_KEY = "foodwise-ph:intro-played";
+
 /** Small helper for tests/dev: read a session flag safely. */
 export function hasVisited(key: string): boolean {
   try {

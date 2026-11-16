@@ -10,10 +10,11 @@ import { Record as RecordPage } from "./pages/Record";
 import { History } from "./pages/History";
 import { Settings } from "./pages/Settings";
 
-function Root() {
+function Root({ onLogout }: { onLogout?: () => void }) {
   const [recordDate, setRecordDate] = useState<string | null>(null);
   const [sideOpen, setSideOpen] = useState(false);
   const [pending, setPending] = useState<RouteKey | null>(null);
+  const [logoutPending, setLogoutPending] = useState(false);
   const guardRef = useRef<(() => boolean) | null>(null);
   const { route, navigate: rawNavigate } = useRoute(next => {
     if (guardRef.current?.()) {setPending(next); return false;}
@@ -39,6 +40,14 @@ function Root() {
     [route, rawNavigate]
   );
 
+  const requestLogout = useCallback(() => {
+    if (guardRef.current?.()) {
+      setLogoutPending(true);
+      return;
+    }
+    onLogout?.();
+  }, [onLogout]);
+
   return (
     <NavGuardContext.Provider value={{ register }}>
       <AppShell
@@ -46,6 +55,7 @@ function Root() {
         navigate={navigate}
         sideOpen={sideOpen}
         setSideOpen={setSideOpen}
+        onLogout={requestLogout}
       >
         {route === "menu" ? <Menu /> : null}
         {route === "record" ? <RecordPage navigate={navigate} initialDate={recordDate} /> : null}
@@ -65,15 +75,26 @@ function Root() {
           if (pending) rawNavigate(pending);
         }}
       />
+
+      <ConfirmDialog
+        open={logoutPending}
+        title="You have unsaved changes. Log out anyway?"
+        description="You have records you haven't saved yet. Logging out now will discard them."
+        confirmLabel="Log Out Without Saving"
+        cancelLabel="Stay"
+        tone="danger"
+        onClose={() => setLogoutPending(false)}
+        onConfirm={() => onLogout?.()}
+      />
     </NavGuardContext.Provider>
   );
 }
 
-export default function App() {
+export default function App({ onLogout }: { onLogout?: () => void }) {
   return (
     <ToastProvider>
       <DataProvider>
-        <Root />
+        <Root onLogout={onLogout} />
       </DataProvider>
     </ToastProvider>
   );

@@ -9,10 +9,8 @@ import { ProductShowcase } from "./scenes/ProductShowcase";
 import { FeatureShowcase, HowItWorks, VisionSection } from "./scenes/SupportSections";
 import { GrandFinale, LandingFooter } from "./scenes/GrandFinale";
 import { navigate, DEMO_PATH } from "./router";
-import { hasVisited, markVisited, usePrefersReducedMotion } from "./hooks";
+import { INTRO_KEY, hasVisited, markVisited, usePrefersReducedMotion } from "./hooks";
 import { ScrollTrigger } from "./gsap";
-
-const INTRO_KEY = "foodwise-ph:intro-played";
 
 export function LandingPage() {
   const reduced = usePrefersReducedMotion();
