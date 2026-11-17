@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { LayoutGrid, ClipboardList, LineChart, Check, Leaf, Gauge, Recycle } from "lucide-react";
+import { Boxes, Check, Gauge, LayoutGrid, Leaf, LineChart, Package, Recycle, ShoppingCart } from "lucide-react";
 import { gsap, ScrollTrigger } from "../gsap";
 import { useInView, usePrefersReducedMotion } from "../hooks";
 import { LANDING_DISHES, forecastFrom } from "../data";
@@ -12,19 +12,25 @@ const FEATURES = [
     key: "menu",
     icon: <LayoutGrid size={20} />,
     title: "Your menu. Organized.",
-    body: "Keep your dishes, categories, and ingredients in one convenient place.",
+    body: "Keep dishes, categories, recipes, prices, and ingredients in one convenient place.",
   },
   {
-    key: "record",
-    icon: <ClipboardList size={20} />,
-    title: "Record what sells.",
-    body: "Enter the number of servings sold each day using a simple recording interface.",
+    key: "pos",
+    icon: <ShoppingCart size={20} />,
+    title: "Sell at the counter.",
+    body: "Charge prepared servings through POS Selling — completed sales become the daily history for you.",
   },
   {
-    key: "prepare",
+    key: "forecast",
     icon: <LineChart size={20} />,
     title: "Know what to prepare.",
-    body: "Use recent sales averages to guide your next preparation quantities.",
+    body: "Recent recorded sales turn into a recommended preparation number for every dish.",
+  },
+  {
+    key: "inventory",
+    icon: <Boxes size={20} />,
+    title: "See your stock.",
+    body: "Ingredients are deducted when food is prepared, so the remaining stock always matches the kitchen.",
   },
 ] as const;
 
@@ -40,23 +46,42 @@ function FeatureArt({ kind }: { kind: (typeof FEATURES)[number]["key"] }) {
       </div>
     );
   }
-  if (kind === "record") {
+  if (kind === "pos") {
     return (
-      <div className="feature__slider">
-        {[64, 46, 78].map((w, i) => (
-          <span key={w}>
-            <i style={{ "--w": `${w}%`, "--i": i } as CSSProperties} />
-          </span>
+      <div className="feature__cart">
+        <span className="feature__cart-row">
+          Fried Chicken <b>₱265</b>
+        </span>
+        <span className="feature__cart-row">
+          Affogato <b>₱120</b>
+        </span>
+        <span className="feature__cart-total">
+          Total <b>₱385</b>
+        </span>
+      </div>
+    );
+  }
+  if (kind === "forecast") {
+    const sales = LANDING_DISHES[1].sales;
+    return (
+      <div className="feature__bars" aria-hidden="true">
+        {sales.map((v, i) => (
+          <i key={i} style={{ "--h": (v / 50).toFixed(2), "--i": i } as CSSProperties} />
         ))}
       </div>
     );
   }
-  const sales = LANDING_DISHES[1].sales;
   return (
-    <div className="feature__bars" aria-hidden="true">
-      {sales.map((v, i) => (
-        <i key={i} style={{ "--h": (v / 50).toFixed(2), "--i": i } as CSSProperties} />
-      ))}
+    <div className="feature__stock" aria-hidden="true">
+      <span>
+        <Package size={13} /> Chicken pieces <b>18 kg</b>
+      </span>
+      <span className="is-low">
+        <Package size={13} /> Fresh Squid <b>4 kg</b>
+      </span>
+      <span className="is-out">
+        <Package size={13} /> Fresh Milk <b>0 L</b>
+      </span>
     </div>
   );
 }
@@ -88,7 +113,7 @@ export function FeatureShowcase() {
           <span className="lp-eyebrow">Capabilities</span>
           <h2 className="lp-h2">Everything starts with better planning.</h2>
           <p className="lp-lead">
-            Three small, focused tools — and one number that ties them together.
+            Four connected tools — preparation, selling, stock, and the numbers that tie them together.
           </p>
         </div>
         <div className="features__grid">
@@ -104,9 +129,9 @@ export function FeatureShowcase() {
 /* ------------------------------------------------------------- HowItWorks */
 
 const STEPS = [
-  { n: "01", title: "Build your menu", body: "Add dishes, categories, and ingredients in a minute." },
-  { n: "02", title: "Record daily sales", body: "Enter the servings sold for each dish at close." },
-  { n: "03", title: "Prepare with guidance", body: "Prepare against the recommended servings for each dish." },
+  { n: "01", title: "Set up your kitchen", body: "Add dishes, recipes, prices, and the ingredient stock you have on hand." },
+  { n: "02", title: "Prepare, sell, wrap up", body: "Prepare batches, sell servings through POS Selling, and close the day with Wrap Up." },
+  { n: "03", title: "Plan the next preparation", body: "Use recorded sales and stock status to guide tomorrow's quantities." },
 ];
 
 /** Scene 8 — three steps, smarter preparation. */
@@ -201,6 +226,9 @@ export function VisionSection() {
         </div>
 
         <div className={`vision__orbit rv${inView ? " is-in" : ""}`} style={{ ["--d" as string]: "120ms" } as CSSProperties} aria-hidden="true">
+          <span className="vision__ring vision__ring--one" />
+          <span className="vision__ring vision__ring--two" />
+          <span className="vision__ring vision__ring--three" />
           <span className="vision__dots">
             <span className="orbit-dot" style={{ top: "4%", left: "46%" }} />
             <span className="orbit-dot" style={{ top: "74%", left: "12%" }} />

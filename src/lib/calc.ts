@@ -272,65 +272,161 @@ export function stockLevel(ingredient: Ingredient): StockLevel {
 
 /* --------------------------------------------------------------- insights */
 
+export type InsightKind =
+  | "overproduction"
+  | "popular"
+  | "waste"
+  | "stock"
+  | "history"
+  | "ok";
+
 export interface Insight {
   id: string;
+  kind: InsightKind;
   tone: "warn" | "info" | "good";
   text: string;
+  /** Suggested operational action shown in the Insight panel. */
+  action?: string;
 }
 
-/** Predefined, condition-based recommendations (PRD §3.8). No live AI. */
-export function insights(data: AppData, range: PeriodRange): Insight[] {
+/**
+ * Transparent, rule-based observations (PRD §3.8 / §1.2). These are computed
+ * from the application's own records — no AI model or external service is
+ * involved, and the UI labels them accordingly.
+ */
+export function insights(data: AppData, range: PeriodRange, limit = 4): Insight[] {
   const out: Insight[] = [];
   const stock = stockState(data);
+  const active = data.products.filter((p) => p.status === "active");
 
   if (stock.out.length) {
     out.push({
       id: "out",
+      kind: "stock",
       tone: "warn",
-      text: `${stock.out.length} ingredient${stock.out.length === 1 ? " is" : "s are"} out of stock. Restock before the next preparation cycle.`,
+      text: `${stock.out.length} ingredient${stock.out.length === 1 ? " is" : "s are"} out of stock.`,
+      action: `Restock ${stock.out.slice(0, 3).map((i) => i.name).join(", ")}${stock.out.length > 3 ? " and others" : ""} before the next preparation cycle.`,
     });
   } else if (stock.low.length) {
     out.push({
       id: "low",
+      kind: "stock",
       tone: "warn",
-      text: `${stock.low.length} ingredient${stock.low.length === 1 ? " is" : "s are"} running low. Restock before the next preparation cycle.`,
+      text: `${stock.low.length} ingredient${stock.low.length === 1 ? " is" : "s are"} running low.`,
+      action: `Review the low-stock list in Inventory and add stock for ${stock.low.slice(0, 3).map((i) => i.name).join(", ")}${stock.low.length > 3 ? " and others" : ""}.`,
     });
   }
 
-  for (const product of data.products.filter((p) => p.status === "active")) {
+  const overproduced: string[] = [];
+  const popular: string[] = [];
+  for (const product of active) {
     const prepared = preparedQty(data, product.id, range);
     const sold = soldQty(data, product.id, range);
     if (prepared >= 10 && sold < prepared * 0.55) {
+      overproduced.push(product.name);
       out.push({
         id: `over-${product.id}`,
+        kind: "overproduction",
         tone: "warn",
         text: `Prepare fewer servings of ${product.name} — ${prepared - sold} of ${prepared} prepared servings went unsold.`,
+        action: `Lower the prepared quantity for ${product.name}, or check whether the recorded sales days are complete.`,
       });
     } else if (prepared > 0 && sold >= prepared * 0.9) {
+      popular.push(product.name);
       out.push({
         id: `popular-${product.id}`,
+        kind: "popular",
         tone: "info",
-        text: `Review preparation quantities for ${product.name} — it has been selling out.`,
+        text: `${product.name} has been selling out — ${sold} of ${prepared} prepared servings sold.`,
+        action: `Consider preparing a little more ${product.name} next cycle, using its recommendation as the baseline.`,
       });
     }
   }
 
-  const shortHistory = data.products.filter(
-    (p) => p.status === "active" && forecastFor(data, p.id).validDays < FORECAST_WINDOW
-  );
+  // Products that are repeatedly discarded across Wrap Up records.
+  const wasteByProduct = new Map<string, { name: string; qty: number; days: number }>();
+  for (const closing of data.closings) {
+    if (!inRange(closing.date, range)) continue;
+    for (const line of closing.lines) {
+      if (line.discarded <= 0) continue;
+      const product = data.products.find((p) => p.id === line.productId);
+      if (!product) continue;
+      const entry = wasteByProduct.get(line.productId) ?? { name: product.name, qty: 0, days: 0 };
+      entry.qty += line.discarded;
+      entry.days += 1;
+      wasteByProduct.set(line.productId, entry);
+    }
+  }
+  for (const [productId, entry] of wasteByProduct) {
+    if (entry.days < 2) continue;
+    out.push({
+      id: `waste-${productId}`,
+      kind: "waste",
+      tone: "warn",
+      text: `${entry.name} has been discarded on ${entry.days} wrapped-up days (${entry.qty} servings in total).`,
+      action: `Trim ${entry.name} preparation towards its recommended servings and re-check after the next Wrap Up.`,
+    });
+  }
+
+  const shortHistory = active.filter((p) => forecastFor(data, p.id).validDays < FORECAST_WINDOW);
   if (shortHistory.length) {
     out.push({
       id: "history",
+      kind: "history",
       tone: "info",
-      text: `Continue recording sales for ${shortHistory.length} dish${shortHistory.length === 1 ? "" : "es"} — forecasting needs ${FORECAST_WINDOW} recorded days.`,
+      text: `${shortHistory.length} dish${shortHistory.length === 1 ? "" : "es"} have fewer than ${FORECAST_WINDOW} recorded days.`,
+      action: "Keep completing POS sales and wrapping up each day so the forecast window fills up.",
     });
   }
 
   if (!out.length) {
-    out.push({ id: "ok", tone: "good", text: "Everything looks balanced. Keep recording sales to sharpen the forecasts." });
+    out.push({
+      id: "ok",
+      kind: "ok",
+      tone: "good",
+      text: "Preparation and sales look balanced for this period.",
+      action: "Keep recording sales and wrapping up each day to sharpen the forecasts.",
+    });
   }
 
-  return out.slice(0, 4);
+  return out.slice(0, limit);
+}
+
+/** Sell-through helpers shared by the Dashboard and its panels. */
+export function sellThrough(prepared: number, sold: number): number | null {
+  return prepared > 0 ? sold / prepared : null;
+}
+
+export interface ProductFlow {
+  productId: string;
+  name: string;
+  category: string;
+  prepared: number;
+  sold: number;
+  remaining: number;
+  discarded: number;
+  sellThrough: number | null;
+}
+
+export function productFlow(data: AppData, range: PeriodRange): ProductFlow[] {
+  return data.products
+    .filter((p) => p.status === "active")
+    .map((product) => {
+      const prepared = preparedQty(data, product.id, range);
+      const sold = soldQty(data, product.id, range);
+      const discarded = discardedQty(data, product.id, range);
+      return {
+        productId: product.id,
+        name: product.name,
+        category: product.category,
+        prepared,
+        sold,
+        remaining: availableServings(data, product.id),
+        discarded,
+        sellThrough: sellThrough(prepared, sold),
+      };
+    })
+    .sort((a, b) => b.prepared - a.prepared);
 }
 
 /* ------------------------------------------------------------------ closing */

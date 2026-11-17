@@ -2502,3 +2502,650 @@
     font-size: 10.5px;
   }
 }
+
+
+/* =======================================================================
+   Dashboard: balanced grid + clickable cards (PRD 1.1 - 1.3)
+   ======================================================================= */
+
+.dashgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.card--click {
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.28s var(--ease, ease), box-shadow 0.28s var(--ease, ease),
+    border-color 0.28s var(--ease, ease);
+}
+
+/* Animated border highlight that sweeps in on hover. */
+.card--click::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--fw-gold), transparent);
+  opacity: 0;
+  transition: opacity 0.3s var(--ease, ease);
+  pointer-events: none;
+}
+
+.card--click:hover::before,
+.card--click:focus-visible::before {
+  opacity: 0.95;
+}
+
+.card__hint {
+  display: inline-flex;
+  color: var(--fw-muted);
+  opacity: 0.5;
+  transition: transform 0.28s var(--ease, ease), opacity 0.28s var(--ease, ease),
+    color 0.28s var(--ease, ease);
+}
+
+.card__title .ico {
+  transition: transform 0.28s var(--ease, ease);
+}
+
+/* PanelCard markup keeps the same rhythm as the shared Card component. */
+.card--click .card__sub {
+  margin-top: -6px;
+  margin-bottom: 12px;
+}
+
+/* The first dashboard row pairs a short bar list with a taller stat grid.
+   Let both cards fill the row, then spend the extra height on the bars so
+   neither card leaves a dead gap underneath its content. */
+.dashgrid > .card--click:nth-child(-n + 2) {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+}
+
+.dashgrid > .card--click:nth-child(-n + 2) .vs {
+  flex: 1 1 auto;
+  align-content: space-evenly;
+}
+
+.dashgrid > .card--click:nth-child(-n + 2) > .note {
+  margin-top: auto;
+}
+
+.card--click:focus-visible {
+  outline: 3px solid var(--fw-gold);
+  outline-offset: 3px;
+}
+
+@media (hover: hover) {
+  .card--click:hover {
+    transform: translateY(-4px) scale(1.015);
+    border-color: rgba(230, 197, 71, 0.6);
+    box-shadow: var(--fw-depth), 0 28px 54px -30px rgba(36, 77, 32, 0.7),
+      0 0 0 4px rgba(230, 197, 71, 0.12);
+  }
+
+  .card--click:hover .card__title .ico {
+    transform: scale(1.14) rotate(-5deg);
+  }
+
+  .card--click:hover .card__hint {
+    transform: translateX(3px);
+    opacity: 1;
+    color: var(--fw-primary);
+  }
+
+  .card--click:hover .vs__fill,
+  .card--click:hover .sparkbars__col i {
+    filter: brightness(1.08) saturate(1.06);
+  }
+
+  .card--click:hover .statgrid .stat {
+    border-color: rgba(230, 197, 71, 0.45);
+  }
+}
+
+.card--click:active {
+  transform: translateY(-1px) scale(1.004);
+}
+
+.statgrid .stat {
+  transition: border-color 0.28s var(--ease, ease), background-color 0.28s var(--ease, ease);
+}
+
+.vs__fill,
+.sparkbars__col i {
+  transition: filter 0.28s var(--ease, ease), width 0.45s var(--ease, ease);
+}
+
+/* --- Panel internals -------------------------------------------------- */
+
+.flowlist {
+  display: grid;
+  gap: 11px;
+}
+
+.flowlist li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(88px, 1.3fr) 64px;
+  align-items: center;
+  gap: 10px;
+}
+
+.flowlist__name {
+  font-size: 12.5px;
+  color: var(--fw-text);
+  overflow-wrap: anywhere;
+}
+
+.flowlist__bars {
+  display: grid;
+  gap: 3px;
+}
+
+.flowlist__bars i {
+  display: block;
+  height: 7px;
+  border-radius: 999px;
+}
+
+.flowlist__prep {
+  background: linear-gradient(90deg, var(--fw-gold-bright), #c9a92f);
+}
+
+.flowlist__sold {
+  background: linear-gradient(90deg, #4f9040, var(--fw-primary));
+}
+
+.flowlist__nums {
+  text-align: right;
+  font-size: 11.5px;
+  color: var(--fw-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.wastelogs {
+  display: grid;
+  gap: 0;
+}
+
+.wastelogs li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px dashed var(--fw-line);
+  font-size: 12.5px;
+}
+
+.wastelogs li:last-child {
+  border-bottom: 0;
+}
+
+.wastelogs__date {
+  color: var(--fw-primary-dark);
+  font-weight: 600;
+}
+
+.wastelogs__nums {
+  color: var(--fw-muted);
+  text-align: right;
+}
+
+.insights__action {
+  display: block;
+  margin-top: 5px;
+  font-style: normal;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fw-primary);
+}
+
+@media (max-width: 760px) {
+  .dashgrid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .flowlist li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name nums"
+      "bars bars";
+    row-gap: 6px;
+  }
+
+  .flowlist__name {
+    grid-area: name;
+  }
+
+  .flowlist__nums {
+    grid-area: nums;
+  }
+
+  .flowlist__bars {
+    grid-area: bars;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card--click:hover {
+    transform: none;
+  }
+
+  .card--click:hover .card__title .ico,
+  .card--click:hover .card__hint {
+    transform: none;
+  }
+}
+
+/* --- FoodWise Assistant (chef mouse) ---------------------------------- */
+
+.assistant {
+  position: fixed;
+  right: clamp(12px, 2vw, 26px);
+  bottom: clamp(16px, 2.4vh, 28px);
+  z-index: 45;
+  pointer-events: none;
+}
+
+/* On the POS screen the cart owns the lower-right corner: keep the mascot
+   clear of the cart panel (desktop) and the sticky cart bar (mobile). */
+@media (min-width: 901px) {
+  .assistant--pos {
+    right: auto;
+    left: calc(var(--side-w, 268px) + 34px);
+  }
+
+  .assistant--pos .assistant__panel {
+    right: auto;
+    left: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .assistant.assistant--pos {
+    right: 10px;
+    bottom: calc(168px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.assistant > * {
+  pointer-events: auto;
+}
+
+.assistant__panel {
+  position: absolute;
+  right: 0;
+  bottom: 96px;
+  width: min(380px, calc(100vw - 24px));
+  max-height: min(560px, calc(100dvh - 150px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--fw-border);
+  border-radius: var(--fw-radius-xl);
+  background: var(--fw-glass-strong);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  backdrop-filter: blur(18px) saturate(1.3);
+  box-shadow: var(--fw-depth), 0 30px 60px -32px rgba(36, 77, 32, 0.55);
+  animation: assistant-panel-in 0.3s var(--ease-out, ease-out);
+}
+
+@keyframes assistant-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+}
+
+.assistant__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--fw-line);
+}
+
+.assistant__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.assistant__avatar {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 30%, #fff7d6, #f1ead8);
+  border: 1px solid var(--fw-border);
+}
+
+.assistant__titles {
+  display: grid;
+  min-width: 0;
+}
+
+.assistant__titles b {
+  font: 400 15px/1.2 var(--font-display);
+  color: var(--fw-primary-dark);
+}
+
+.assistant__titles small {
+  font-size: 11.5px;
+  color: var(--fw-muted);
+}
+
+.assistant__mode {
+  justify-self: start;
+  margin-top: 4px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--fw-soft-gold);
+  border: 1px solid rgba(230, 197, 71, 0.5);
+  color: #8a6c10;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.assistant__icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  border: 1px solid var(--fw-line);
+  background: var(--fw-glass);
+  color: var(--fw-muted);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.assistant__icon:hover {
+  background: var(--fw-soft-gold);
+  color: var(--fw-primary-dark);
+}
+
+.assistant__messages {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  overflow-y: auto;
+  max-height: min(300px, 38dvh);
+  padding-right: 2px;
+}
+
+.assistant__msg {
+  max-width: 92%;
+  padding: 10px 13px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  border: 1px solid var(--fw-line);
+  background: #fff;
+  color: var(--fw-text);
+}
+
+.assistant__msg--assistant {
+  border-bottom-left-radius: 5px;
+}
+
+.assistant__msg--user {
+  justify-self: end;
+  background: var(--fw-primary);
+  border-color: var(--fw-primary-dark);
+  color: #fff;
+  border-bottom-right-radius: 5px;
+}
+
+.assistant__quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.assistant__chip {
+  padding: 7px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--fw-border);
+  background: var(--fw-glass);
+  color: var(--fw-primary-dark);
+  font-size: 11.5px;
+  text-align: left;
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.assistant__chip:hover {
+  background: var(--fw-soft-gold);
+  border-color: var(--fw-gold);
+  transform: translateY(-1px);
+}
+
+.assistant__composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.assistant__composer input {
+  min-width: 0;
+  padding: 10px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--fw-border);
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  color: var(--fw-text);
+}
+
+.assistant__composer input:focus {
+  outline: 2px solid var(--fw-gold);
+  outline-offset: 1px;
+}
+
+.assistant__send {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  border-radius: 999px;
+  background: var(--fw-primary);
+  color: #fff;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.assistant__send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.assistant__disclaimer {
+  margin: 0;
+  color: var(--fw-muted);
+  font-size: 10.5px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.assistant__dock {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  animation: assistant-sway 22s ease-in-out infinite;
+}
+
+.assistant__mascot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 1px solid rgba(230, 197, 71, 0.45);
+  background: radial-gradient(circle at 50% 28%, #fff7d6, #f2ead6 68%, #e6dcc4);
+  box-shadow: 0 18px 36px -18px rgba(36, 77, 32, 0.55), 0 0 0 6px rgba(255, 255, 255, 0.55);
+  animation: assistant-bob 4.6s ease-in-out infinite;
+  transition: transform 0.25s var(--ease-out, ease-out);
+}
+
+.assistant__mascot:hover {
+  transform: scale(1.05);
+}
+
+.assistant__badge {
+  position: absolute;
+  right: -6px;
+  bottom: 2px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--fw-primary);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  box-shadow: 0 6px 14px -8px rgba(36, 77, 32, 0.9);
+}
+
+.assistant__hide {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--fw-border);
+  background: var(--fw-glass-strong);
+  color: var(--fw-muted);
+  opacity: 0;
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.assistant__dock:hover .assistant__hide,
+.assistant__hide:focus-visible {
+  opacity: 1;
+}
+
+.assistant__hide:hover {
+  color: var(--fw-text);
+}
+
+.assistant__restore {
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--fw-border);
+  background: var(--fw-glass-strong);
+  box-shadow: var(--fw-shadow-sm);
+  color: var(--fw-primary-dark);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.assistant-mouse {
+  object-fit: contain;
+  overflow: visible;
+  user-select: none;
+  -webkit-user-drag: none;
+  transform-origin: 50% 88%;
+  animation: assistant-breath 3.4s ease-in-out infinite;
+}
+
+@keyframes assistant-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+@keyframes assistant-breath {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
+}
+
+/* A small, bounded drift inside the dock's safe area — a fallback for a
+   proper walk cycle, which this single-image mascot does not have. */
+@keyframes assistant-sway {
+  0%,
+  64%,
+  100% {
+    transform: translateX(0);
+  }
+  70% {
+    transform: translateX(-7px);
+  }
+  76% {
+    transform: translateX(5px);
+  }
+  82% {
+    transform: translateX(-4px);
+  }
+  88% {
+    transform: translateX(2px);
+  }
+}
+
+@media (max-width: 720px) {
+  .assistant {
+    right: 10px;
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Keep the sheet above the bottom tab bar so navigation stays reachable. */
+  .assistant__panel {
+    position: fixed;
+    inset: auto 0 calc(76px + env(safe-area-inset-bottom, 0px)) 0;
+    width: 100%;
+    max-height: calc(100dvh - 96px - env(safe-area-inset-bottom, 0px));
+    border-radius: 22px;
+    padding-bottom: 14px;
+    animation: assistant-sheet-in 0.3s var(--ease-out, ease-out);
+  }
+
+  .assistant__messages {
+    max-height: 38dvh;
+  }
+
+  .assistant__dock {
+    animation: none;
+  }
+
+  @keyframes assistant-sheet-in {
+    from {
+      opacity: 0;
+      transform: translateY(40px);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assistant__mascot,
+  .assistant__dock,
+  .assistant-mouse,
+  .assistant__panel {
+    animation: none !important;
+  }
+
+  .assistant__mascot:hover,
+  .assistant__chip:hover {
+    transform: none;
+  }
+}

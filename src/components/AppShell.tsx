@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { BrandMark } from "./Brand";
+import { Assistant } from "./Assistant";
 import { IconButton } from "./ui";
 import { useStore } from "../data/store";
 import { ROUTES, type RouteKey } from "../hooks";
@@ -318,6 +319,8 @@ export function AppShell({
       </div>
 
       <MobileTabBar route={route} navigate={navigate} />
+
+      <Assistant route={route} />
     </div>
   );
 }

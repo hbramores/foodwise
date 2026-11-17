@@ -74,7 +74,7 @@ export function GrandFinale({ onEnterDemo }: { onEnterDemo: () => void }) {
   return (
     <section className="finale" id="finale" ref={ref}>
       <canvas ref={canvasRef} className="finale__canvas" aria-hidden="true" />
-      <div className="finale__inner">
+      <div className={`finale__inner${visible ? " is-in" : ""}`}>
         <img className="finale__logo" src={LOGO_SRC} alt="FoodWise PH" />
         <h2 className="finale__headline">
           Less guesswork.
